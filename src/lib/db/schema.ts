@@ -162,6 +162,8 @@ export const messages = pgTable(
     content: text("content").notNull(),
     /** Resolved citations attached to an assistant answer. */
     citations: jsonb("citations").$type<StoredCitation[]>(),
+    /** Where each citation marker sits within `content`. */
+    markers: jsonb("markers").$type<CitationMarker[]>(),
     /** Which sources were in scope when the question was asked. */
     scopedSourceIds: jsonb("scoped_source_ids").$type<string[]>(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -182,6 +184,7 @@ export const notes = pgTable(
     content: text("content").notNull(),
     origin: noteOrigin("origin").notNull().default("manual"),
     citations: jsonb("citations").$type<StoredCitation[]>(),
+    markers: jsonb("markers").$type<CitationMarker[]>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -200,6 +203,7 @@ export const studioDocs = pgTable(
     title: text("title").notNull(),
     content: text("content").notNull().default(""),
     citations: jsonb("citations").$type<StoredCitation[]>(),
+    markers: jsonb("markers").$type<CitationMarker[]>(),
     status: jobStatus("status").notNull().default("pending"),
     error: text("error"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -301,6 +305,13 @@ export type StoredCitation = {
   endChar: number;
   segmentLabel?: string;
 };
+
+/**
+ * Where a citation marker is rendered inside the answer text. Kept separate
+ * from the citation itself because one passage can be cited at several points,
+ * and each occurrence needs its own position while sharing a marker number.
+ */
+export type CitationMarker = { position: number; index: number };
 
 export type DialogueTurn = { speaker: string; text: string };
 

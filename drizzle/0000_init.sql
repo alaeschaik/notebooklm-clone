@@ -37,6 +37,7 @@ CREATE TABLE "messages" (
 	"role" "message_role" NOT NULL,
 	"content" text NOT NULL,
 	"citations" jsonb,
+	"markers" jsonb,
 	"scoped_source_ids" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -67,6 +68,7 @@ CREATE TABLE "notes" (
 	"content" text NOT NULL,
 	"origin" "note_origin" DEFAULT 'manual' NOT NULL,
 	"citations" jsonb,
+	"markers" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -93,6 +95,7 @@ CREATE TABLE "studio_docs" (
 	"title" text NOT NULL,
 	"content" text DEFAULT '' NOT NULL,
 	"citations" jsonb,
+	"markers" jsonb,
 	"status" "job_status" DEFAULT 'pending' NOT NULL,
 	"error" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL

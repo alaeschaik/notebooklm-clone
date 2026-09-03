@@ -1,5 +1,5 @@
 {
-  "id": "5e84d71f-5d83-41fa-9f3e-659d57a395d2",
+  "id": "64ddaa86-6dad-4871-b1bf-ea396ed0e86f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -317,6 +317,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "markers": {
+          "name": "markers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "scoped_source_ids": {
           "name": "scoped_source_ids",
           "type": "jsonb",
@@ -603,6 +609,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "markers": {
+          "name": "markers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -828,6 +840,12 @@
         },
         "citations": {
           "name": "citations",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "markers": {
+          "name": "markers",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

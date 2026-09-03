@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { AnthropicBeta } from "@anthropic-ai/sdk/resources/beta";
 
 /**
  * Opus 5 is used throughout. Grounded answering with citations is the app's
@@ -31,9 +32,11 @@ export function getClaude(): Anthropic {
 }
 
 /** Shared request fields for every call that grounds on notebook sources. */
-export const groundedDefaults = {
-  model: MODEL,
-  betas: [FALLBACK_BETA],
-  fallbacks: "default",
-  thinking: { type: "adaptive" },
-} as const;
+export function groundedDefaults() {
+  return {
+    model: MODEL,
+    betas: [FALLBACK_BETA] as AnthropicBeta[],
+    fallbacks: "default" as const,
+    thinking: { type: "adaptive" as const },
+  };
+}
