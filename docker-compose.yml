@@ -1,0 +1,23 @@
+# Local Postgres with pgvector, so the project runs end to end without a Neon
+# account. Production uses Neon; src/lib/db picks the driver from the URL.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: notebooklm-pg
+    environment:
+      POSTGRES_USER: notebook
+      POSTGRES_PASSWORD: notebook
+      POSTGRES_DB: notebook
+    ports:
+      # 5433 to avoid colliding with a Postgres already running on 5432.
+      - "5433:5432"
+    volumes:
+      - notebooklm-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notebook -d notebook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  notebooklm-pgdata:
