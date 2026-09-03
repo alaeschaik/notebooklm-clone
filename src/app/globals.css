@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens.
+   Light is the base palette; the dark block only re-points the same names, so
+   every component styles itself once and themes for free.
+--------------------------------------------------------------------------- */
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f2f2ef;
+  --surface-3: #e8e8e3;
+  --border: #e2e2dd;
+  --border-strong: #cfcfc7;
+
+  --fg: #1a1a18;
+  --fg-muted: #5c5c56;
+  --fg-subtle: #8a8a82;
+
+  --accent: #2f6df6;
+  --accent-hover: #1f5ae0;
+  --accent-fg: #ffffff;
+  --accent-soft: #e8f0ff;
+  --accent-border: #b9d0ff;
+
+  --highlight: #fff3b8;
+  --highlight-strong: #ffe57a;
+
+  --danger: #c0392f;
+  --danger-soft: #fdeceb;
+  --success: #1f7a4d;
+  --success-soft: #e6f4ed;
+  --warning: #a86a12;
+  --warning-soft: #fdf2e0;
+
+  --radius: 0.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131315;
+    --surface: #1b1b1e;
+    --surface-2: #232327;
+    --surface-3: #2c2c31;
+    --border: #303036;
+    --border-strong: #43434b;
+
+    --fg: #ececee;
+    --fg-muted: #a3a3ab;
+    --fg-subtle: #74747d;
+
+    --accent: #6f9bff;
+    --accent-hover: #86adff;
+    --accent-fg: #10131a;
+    --accent-soft: #1c2740;
+    --accent-border: #2f4570;
+
+    --highlight: #5c4a12;
+    --highlight-strong: #7a6218;
+
+    --danger: #f0796d;
+    --danger-soft: #3a1e1c;
+    --success: #5cc48d;
+    --success-soft: #14301f;
+    --warning: #e0a44a;
+    --warning-soft: #33260f;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-border: var(--accent-border);
+
+  --color-highlight: var(--highlight);
+  --color-highlight-strong: var(--highlight-strong);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  --radius-base: var(--radius);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin, unobtrusive scrollbars — the app is three tall scrolling columns. */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out;
+}
