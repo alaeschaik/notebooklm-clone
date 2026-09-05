@@ -25,3 +25,48 @@ Never introduce facts that are not in the sources. If the sources cover a sectio
 Write in the dominant language of the sources.
 
 Output GitHub-flavoured Markdown. Start directly with the content — no preamble, and no title heading, since the document already has one.`;
+
+/**
+ * The Audio Overview script. Written as a real conversation rather than a
+ * narrated summary, because two voices reacting to each other is what makes
+ * the format listenable — but the hosts are still only allowed to say things
+ * the sources actually support.
+ */
+export function audioScriptPrompt(hosts: readonly string[]): string {
+  return `You are writing a podcast script in which two hosts, ${hosts[0]} and ${hosts[1]}, discuss a set of documents a listener has collected.
+
+Make it a genuine conversation. The hosts think out loud, pick up each other's points, disagree where the sources disagree, and ask the question a listener would ask next. What you must not write is two people taking turns reading a summary aloud.
+
+Ground everything in the documents. Do not invent studies, numbers, quotes or events. If the sources leave something open, one of the hosts should say so — that is far more interesting than a confident answer nobody can check.
+
+Structure: open by framing what these documents are and why they are worth 5 minutes. Work through the two or three ideas that actually matter. Close on what it means or what remains unresolved. No "welcome back to the show", no sponsors, no sign-off jingle.
+
+Style: spoken language, contractions, varied sentence length. Aim for about 4500 characters of speech in total, split across roughly 30 to 45 turns. Never write stage directions, sound effects or bracketed notes — every character is read aloud verbatim.
+
+Write in the dominant language of the documents.`;
+}
+
+/** The mind map. Structure matters more than exhaustiveness. */
+export const MIND_MAP_SYSTEM = `You map the conceptual structure of a set of documents.
+
+Produce a tree with one root naming the overall subject, three to six main branches, and two to four children under each. Depth beyond three levels is not useful to read.
+
+Labels are short noun phrases, at most five words — they are read at a glance, not as sentences. Each node carries a one-sentence summary explaining what it covers.
+
+Group by idea, not by document. Two sources discussing the same concept belong under one node. Only reflect what the documents actually contain.
+
+Write in the dominant language of the documents.`;
+
+/** What each studio document is for. Kept short — the system prompt does the work. */
+export const STUDIO_BRIEFS: Record<string, string> = {
+  briefing:
+    "Write a briefing document: what these sources are about, the key findings, and what someone acting on them needs to know. Open with a short executive summary, then the detail under clear headings.",
+  study_guide:
+    "Write a study guide: the concepts a learner must understand, defined precisely, followed by review questions that test understanding rather than recall. Order the concepts so each builds on the last.",
+  faq:
+    "Write a FAQ answering the questions a reader would actually bring to this material, including the awkward ones. Each answer stands alone. Use a bold question followed by its answer, not a heading per question.",
+  timeline:
+    "Lay out the events, milestones and developments in chronological order, each with its date and its significance. If the sources are not chronological, say so briefly and organise by whatever sequence they do describe.",
+  summary:
+    "Write a tight summary: what the sources cover, their main claims, and where they agree or diverge. No more than 400 words.",
+};

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Keep the documented template in version control.
 !.env.example
+
+# local blob storage fallback
+/.data
