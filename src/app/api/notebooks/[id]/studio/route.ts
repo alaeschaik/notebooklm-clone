@@ -5,9 +5,11 @@ import { assertUuids, badRequest, handleRouteError, readJson, requireOwnedNotebo
 import { CitationResolver } from "@/lib/ai/citations";
 import { getClaude, groundedDefaults } from "@/lib/ai/claude";
 import { buildContext } from "@/lib/ai/context";
-import { STUDIO_BRIEFS, STUDIO_SYSTEM } from "@/lib/ai/prompts";
+import { STUDIO_BRIEFS, STUDIO_SYSTEM, languageInstruction } from "@/lib/ai/prompts";
+import { getLocale } from "@/lib/i18n/server";
 import { getDb } from "@/lib/db";
 import { studioDocs, studioKind, type CitationMarker } from "@/lib/db/schema";
+import type { Locale } from "@/lib/i18n/dictionaries";
 
 export const maxDuration = 300;
 
@@ -62,7 +64,8 @@ export async function POST(
       })
       .returning();
 
-    after(() => generate(doc.id, notebook.id, kind, sourceIds));
+    const locale = await getLocale();
+    after(() => generate(doc.id, notebook.id, kind, sourceIds, locale));
 
     return NextResponse.json({ doc }, { status: 202 });
   } catch (error) {
@@ -102,6 +105,7 @@ async function generate(
   notebookId: string,
   kind: Kind,
   sourceIds: string[],
+  locale: Locale,
 ) {
   const db = getDb();
 
@@ -122,7 +126,7 @@ async function generate(
       ...groundedDefaults(),
       max_tokens: 12_000,
       output_config: { effort: "high" },
-      system: STUDIO_SYSTEM,
+      system: `${STUDIO_SYSTEM}\n\n${languageInstruction(locale)}`,
       messages: [
         {
           role: "user",

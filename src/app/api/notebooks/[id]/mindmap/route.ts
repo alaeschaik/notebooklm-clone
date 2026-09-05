@@ -2,10 +2,12 @@ import { desc, eq } from "drizzle-orm";
 import { NextResponse, after } from "next/server";
 
 import { assertUuids, badRequest, handleRouteError, readJson, requireOwnedNotebook } from "@/lib/api";
-import { MIND_MAP_SYSTEM } from "@/lib/ai/prompts";
+import { MIND_MAP_SYSTEM, languageInstruction } from "@/lib/ai/prompts";
+import { getLocale } from "@/lib/i18n/server";
 import { generateStructured, loadSourceText } from "@/lib/ai/structured";
 import { getDb } from "@/lib/db";
 import { mindMaps, type MindMapNode } from "@/lib/db/schema";
+import type { Locale } from "@/lib/i18n/dictionaries";
 
 export const maxDuration = 300;
 
@@ -64,18 +66,19 @@ export async function POST(
       .values({ notebookId: notebook.id, status: "running" })
       .returning();
 
-    after(() => generate(job.id, text));
+    const locale = await getLocale();
+    after(() => generate(job.id, text, locale));
     return NextResponse.json({ mindMap: job }, { status: 202 });
   } catch (error) {
     return handleRouteError(error);
   }
 }
 
-async function generate(jobId: string, sourceText: string) {
+async function generate(jobId: string, sourceText: string, locale: Locale) {
   const db = getDb();
   try {
     const map = await generateStructured<MindMapNode>({
-      system: MIND_MAP_SYSTEM,
+      system: `${MIND_MAP_SYSTEM}\n\n${languageInstruction(locale)}`,
       prompt: `Map the structure of these documents.\n\n${sourceText}`,
       schema: node(2),
       effort: "medium",

@@ -2,13 +2,15 @@ import { desc, eq } from "drizzle-orm";
 import { NextResponse, after } from "next/server";
 
 import { assertUuids, badRequest, handleRouteError, readJson, requireOwnedNotebook } from "@/lib/api";
-import { audioScriptPrompt } from "@/lib/ai/prompts";
+import { audioScriptPrompt, languageInstruction } from "@/lib/ai/prompts";
+import { getLocale } from "@/lib/i18n/server";
 import { generateStructured, loadSourceText } from "@/lib/ai/structured";
 import { HOSTS, segmentScript } from "@/lib/audio/script";
 import { renderSegment } from "@/lib/audio/tts";
 import { concatPcm, pcmDurationMs, pcmToWav, type PcmFormat } from "@/lib/audio/wav";
 import { getDb } from "@/lib/db";
 import { audioOverviews, type AudioSegment, type DialogueTurn } from "@/lib/db/schema";
+import type { Locale } from "@/lib/i18n/dictionaries";
 import { putFile } from "@/lib/storage";
 
 export const maxDuration = 300;
@@ -94,7 +96,8 @@ export async function POST(
     // floating promise would get. Rendering an overview is a handful of speech
     // requests, well inside the function budget, and progress is written to
     // the row as it goes so the client polls real state rather than a guess.
-    after(() => generate(job.id, notebook.id, text));
+    const locale = await getLocale();
+    after(() => generate(job.id, notebook.id, text, locale));
 
     return NextResponse.json({ audio: job }, { status: 202 });
   } catch (error) {
@@ -102,7 +105,12 @@ export async function POST(
   }
 }
 
-async function generate(jobId: string, notebookId: string, sourceText: string) {
+async function generate(
+  jobId: string,
+  notebookId: string,
+  sourceText: string,
+  locale: Locale,
+) {
   const db = getDb();
 
   const fail = async (message: string) => {
@@ -117,7 +125,7 @@ async function generate(jobId: string, notebookId: string, sourceText: string) {
       title: string;
       turns: DialogueTurn[];
     }>({
-      system: audioScriptPrompt([HOSTS[0].name, HOSTS[1].name]),
+      system: `${audioScriptPrompt([HOSTS[0].name, HOSTS[1].name])}\n\n${languageInstruction(locale)}`,
       prompt: `Here are the documents to discuss.\n\n${sourceText}`,
       schema: SCRIPT_SCHEMA as unknown as Record<string, unknown>,
       effort: "high",

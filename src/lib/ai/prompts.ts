@@ -1,3 +1,21 @@
+import type { Locale } from "@/lib/i18n/dictionaries";
+
+const LANGUAGE_NAMES: Record<Locale, string> = {
+  en: "English",
+  de: "German",
+};
+
+/**
+ * Studio output follows the reader's chosen interface language rather than the
+ * language of the sources. "Match the sources" sounds sensible but is
+ * unpredictable in practice — a mixed-language notebook, or one whose sources
+ * are in a language the reader does not speak, produces a document they cannot
+ * use. Chat is the exception: there the question itself states the language.
+ */
+export function languageInstruction(locale: Locale): string {
+  return `Write in ${LANGUAGE_NAMES[locale]}, regardless of the language of the source documents.`;
+}
+
 /**
  * The grounding contract. The app's entire value is that an answer can be
  * checked against the user's own material, so the prompt is explicit that a
@@ -11,7 +29,7 @@ If the sources do not answer the question, say so plainly and describe what they
 
 When sources disagree, say so and cite each side rather than silently picking one.
 
-Reply in the language the user wrote in.
+Reply in the language the user asked their question in.
 
 Lead with the answer, then support it. Prefer short paragraphs. Use a list only when the content is genuinely a list, and keep headings out of short answers.`;
 
@@ -21,8 +39,6 @@ export const STUDIO_SYSTEM = `You are generating a reference document from the u
 Ground every claim in the attached documents and cite it. Citations resolve to the exact passage and the user can click through to verify, so cite precisely.
 
 Never introduce facts that are not in the sources. If the sources cover a section only thinly, keep that section short and say what is missing rather than padding it out.
-
-Write in the dominant language of the sources.
 
 Output GitHub-flavoured Markdown. Start directly with the content — no preamble, and no title heading, since the document already has one.`;
 
@@ -41,9 +57,7 @@ Ground everything in the documents. Do not invent studies, numbers, quotes or ev
 
 Structure: open by framing what these documents are and why they are worth 5 minutes. Work through the two or three ideas that actually matter. Close on what it means or what remains unresolved. No "welcome back to the show", no sponsors, no sign-off jingle.
 
-Style: spoken language, contractions, varied sentence length. Aim for about 4500 characters of speech in total, split across roughly 30 to 45 turns. Never write stage directions, sound effects or bracketed notes — every character is read aloud verbatim.
-
-Write in the dominant language of the documents.`;
+Style: spoken language, contractions, varied sentence length. Aim for about 4500 characters of speech in total, split across roughly 30 to 45 turns. Never write stage directions, sound effects or bracketed notes — every character is read aloud verbatim.`;
 }
 
 /** The mind map. Structure matters more than exhaustiveness. */
@@ -53,9 +67,7 @@ Produce a tree with one root naming the overall subject, three to six main branc
 
 Labels are short noun phrases, at most five words — they are read at a glance, not as sentences. Each node carries a one-sentence summary explaining what it covers.
 
-Group by idea, not by document. Two sources discussing the same concept belong under one node. Only reflect what the documents actually contain.
-
-Write in the dominant language of the documents.`;
+Group by idea, not by document. Two sources discussing the same concept belong under one node. Only reflect what the documents actually contain.`;
 
 /** What each studio document is for. Kept short — the system prompt does the work. */
 export const STUDIO_BRIEFS: Record<string, string> = {
