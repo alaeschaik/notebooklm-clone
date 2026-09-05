@@ -1,0 +1,123 @@
+"use client";
+
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+import { ChatPanel } from "@/components/chat/chat-panel";
+import { LocaleSwitcher } from "@/components/locale-switcher";
+import { SourceViewer } from "@/components/sources/source-viewer";
+import { SourcesPanel } from "@/components/sources/sources-panel";
+import { StudioPanel } from "@/components/studio/studio-panel";
+import { useSources } from "@/hooks/use-api";
+import { cn } from "@/lib/cn";
+import type { HighlightTarget } from "@/lib/types";
+
+export function NotebookWorkspace({
+  notebookId,
+  title,
+  emoji,
+}: {
+  notebookId: string;
+  title: string;
+  emoji: string;
+}) {
+  const { sources, mutate } = useSources(notebookId);
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [viewing, setViewing] = useState<HighlightTarget | null>(null);
+
+  // Sources are selected by default, matching the expectation that a question
+  // is asked of the whole notebook unless you narrow it. `null` means "not
+  // initialised yet", so a source added later does not silently deselect the
+  // ones already chosen.
+  useEffect(() => {
+    if (selected !== null || sources.length === 0) return;
+    setSelected(new Set(sources.filter((s) => s.status === "ready").map((s) => s.id)));
+  }, [sources, selected]);
+
+  const readyIds = sources.filter((s) => s.status === "ready").map((s) => s.id);
+  const selectedIds = readyIds.filter((id) => selected?.has(id) ?? true);
+
+  const toggle = useCallback((id: string) => {
+    setSelected((current) => {
+      const next = new Set(current ?? []);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const setAll = useCallback(
+    (on: boolean) => setSelected(on ? new Set(readyIds) : new Set()),
+    [readyIds],
+  );
+
+  const openCitation = useCallback((target: HighlightTarget) => {
+    setViewing(target);
+  }, []);
+
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+        <Link
+          href="/"
+          className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+          aria-label="Back to notebooks"
+        >
+          <ArrowLeft className="size-4" />
+        </Link>
+        <span className="text-lg leading-none">{emoji}</span>
+        <h1 className="truncate font-medium">{title}</h1>
+        <div className="ml-auto flex items-center gap-2">
+          <LocaleSwitcher />
+        </div>
+      </header>
+
+      <main className="grid min-h-0 flex-1 gap-px bg-border lg:grid-cols-[minmax(0,var(--left))_minmax(0,1fr)_minmax(0,22rem)]"
+        style={{ "--left": viewing ? "34rem" : "19rem" } as React.CSSProperties}
+      >
+        <section
+          className={cn(
+            "flex min-h-0 min-w-0 flex-col bg-surface transition-[width]",
+          )}
+        >
+          {viewing ? (
+            <SourceViewer
+              target={viewing}
+              onClose={() => setViewing(null)}
+            />
+          ) : (
+            <SourcesPanel
+              notebookId={notebookId}
+              sources={sources}
+              selected={selectedIds}
+              onToggle={toggle}
+              onToggleAll={setAll}
+              onOpen={(sourceId) =>
+                setViewing({ sourceId, startChar: 0, endChar: 0 })
+              }
+              onChanged={() => void mutate()}
+            />
+          )}
+        </section>
+
+        <section className="flex min-h-0 min-w-0 flex-col bg-surface">
+          <ChatPanel
+            notebookId={notebookId}
+            sources={sources}
+            selectedIds={selectedIds}
+            onCitationClick={openCitation}
+          />
+        </section>
+
+        <section className="hidden min-h-0 min-w-0 flex-col bg-surface lg:flex">
+          <StudioPanel
+            notebookId={notebookId}
+            sources={sources}
+            selectedIds={selectedIds}
+          />
+        </section>
+      </main>
+    </div>
+  );
+}
