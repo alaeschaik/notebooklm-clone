@@ -41,13 +41,16 @@ export async function retrieveChunks({
 }: {
   notebookId: string;
   sourceIds: string[];
-  queryEmbedding: number[];
+  /** `null` when embeddings are unavailable; ranking is then lexical only. */
+  queryEmbedding: number[] | null;
   queryText: string;
   limit?: number;
 }): Promise<RetrievedChunk[]> {
   if (sourceIds.length === 0) return [];
 
-  const vector = toVectorLiteral(queryEmbedding);
+  // An impossible-to-match literal keeps one SQL statement for both paths; the
+  // semantic arm then simply contributes nothing to the fusion.
+  const vector = queryEmbedding ? toVectorLiteral(queryEmbedding) : null;
   const db = getDb();
 
   // Bound parameters, never interpolation: these ids arrive in a request body.
@@ -74,7 +77,7 @@ export async function retrieveChunks({
     semantic AS (
       SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> ${vector}::vector) AS rank
       FROM scoped
-      WHERE embedding IS NOT NULL
+      WHERE ${vector}::vector IS NOT NULL AND embedding IS NOT NULL
       ORDER BY embedding <=> ${vector}::vector
       LIMIT ${ARM_DEPTH}
     ),
