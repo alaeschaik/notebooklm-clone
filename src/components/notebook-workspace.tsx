@@ -2,9 +2,9 @@
 
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import { ChatPanel } from "@/components/chat/chat-panel";
+import { ChatPanel, type ChatHandle } from "@/components/chat/chat-panel";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SourceViewer } from "@/components/sources/source-viewer";
 import { SourcesPanel } from "@/components/sources/sources-panel";
@@ -23,24 +23,24 @@ export function NotebookWorkspace({
   emoji: string;
 }) {
   const { sources, mutate } = useSources(notebookId);
-  const [selected, setSelected] = useState<Set<string> | null>(null);
+  // Deselections are tracked rather than selections. A question is asked of the
+  // whole notebook unless you narrow it, so "everything except what you turned
+  // off" is the real state — and it needs no effect to seed it, and leaves a
+  // source added later selected without disturbing the existing choices.
+  const [deselected, setDeselected] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [viewing, setViewing] = useState<HighlightTarget | null>(null);
+  const chat = useRef<ChatHandle>(null);
 
-  // Sources are selected by default, matching the expectation that a question
-  // is asked of the whole notebook unless you narrow it. `null` means "not
-  // initialised yet", so a source added later does not silently deselect the
-  // ones already chosen.
-  useEffect(() => {
-    if (selected !== null || sources.length === 0) return;
-    setSelected(new Set(sources.filter((s) => s.status === "ready").map((s) => s.id)));
-  }, [sources, selected]);
-
-  const readyIds = sources.filter((s) => s.status === "ready").map((s) => s.id);
-  const selectedIds = readyIds.filter((id) => selected?.has(id) ?? true);
+  const readyIds = sources
+    .filter((source) => source.status === "ready")
+    .map((source) => source.id);
+  const selectedIds = readyIds.filter((id) => !deselected.has(id));
 
   const toggle = useCallback((id: string) => {
-    setSelected((current) => {
-      const next = new Set(current ?? []);
+    setDeselected((current) => {
+      const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -48,7 +48,7 @@ export function NotebookWorkspace({
   }, []);
 
   const setAll = useCallback(
-    (on: boolean) => setSelected(on ? new Set(readyIds) : new Set()),
+    (on: boolean) => setDeselected(on ? new Set() : new Set(readyIds)),
     [readyIds],
   );
 
@@ -107,6 +107,7 @@ export function NotebookWorkspace({
             sources={sources}
             selectedIds={selectedIds}
             onCitationClick={openCitation}
+            ref={chat}
           />
         </section>
 
@@ -115,6 +116,8 @@ export function NotebookWorkspace({
             notebookId={notebookId}
             sources={sources}
             selectedIds={selectedIds}
+            onCitationClick={openCitation}
+            onAsk={(question) => chat.current?.ask(question)}
           />
         </section>
       </main>

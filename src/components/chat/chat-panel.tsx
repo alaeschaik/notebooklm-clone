@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowUp, Square, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowUp, BookmarkPlus, Check, Square, Trash2 } from "lucide-react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 
 import { Answer } from "@/components/chat/answer";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,6 +14,7 @@ import type {
   HighlightTarget,
   Source,
   StoredCitation,
+  StoredMessage,
 } from "@/lib/types";
 
 type ChatEvent =
@@ -22,6 +23,10 @@ type ChatEvent =
   | { type: "citation"; position: number; citation: StoredCitation }
   | { type: "done"; messageId: string }
   | { type: "error"; message: string };
+
+/** Lets the studio drop a question into the composer without lifting the
+ * composer's state out of this component. */
+export type ChatHandle = { ask: (question: string) => void };
 
 type Streaming = {
   question: string;
@@ -37,11 +42,13 @@ export function ChatPanel({
   sources,
   selectedIds,
   onCitationClick,
+  ref,
 }: {
   notebookId: string;
   sources: Source[];
   selectedIds: string[];
   onCitationClick: (target: HighlightTarget) => void;
+  ref?: Ref<ChatHandle>;
 }) {
   const t = useT();
   const { messages, mutate } = useMessages(notebookId);
@@ -50,6 +57,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasReadySource = sources.some((source) => source.status === "ready");
   const canSend = input.trim().length > 0 && selectedIds.length > 0 && !streaming;
@@ -57,6 +65,13 @@ export function ChatPanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, streaming?.text]);
+
+  useImperativeHandle(ref, () => ({
+    ask: (question: string) => {
+      setInput(question);
+      inputRef.current?.focus();
+    },
+  }), []);
 
   async function send() {
     const question = input.trim();
@@ -175,7 +190,7 @@ export function ChatPanel({
                 </p>
               </div>
             ) : (
-              <div key={message.id} className="animate-fade-in">
+              <div key={message.id} className="group animate-fade-in">
                 <Answer
                   content={message.content}
                   citations={message.citations ?? []}
@@ -187,6 +202,7 @@ export function ChatPanel({
                   label={t.chat.citationsLabel}
                   onCitationClick={onCitationClick}
                 />
+                <SaveToNotes notebookId={notebookId} message={message} />
               </div>
             ),
           )}
@@ -248,6 +264,7 @@ export function ChatPanel({
             className="flex items-end gap-2 rounded-xl border border-border bg-surface p-1.5 focus-within:border-accent"
           >
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -344,5 +361,55 @@ function CitationList({
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * Saving an answer keeps its citations, so a note stays as verifiable as the
+ * answer it came from rather than degrading into a loose quote.
+ */
+function SaveToNotes({
+  notebookId,
+  message,
+}: {
+  notebookId: string;
+  message: StoredMessage;
+}) {
+  const t = useT();
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    await fetch(`/api/notebooks/${notebookId}/notes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: message.content.slice(0, 60).replace(/\s+\S*$/, "") || "Note",
+        content: message.content,
+        origin: "chat",
+        citations: message.citations,
+        markers: message.markers,
+      }),
+    });
+    setSaved(true);
+  }
+
+  return (
+    <button
+      onClick={save}
+      disabled={saved}
+      className="mt-2 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-fg-subtle opacity-0 transition group-hover:opacity-100 hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 disabled:opacity-100"
+    >
+      {saved ? (
+        <>
+          <Check className="size-3 text-success" />
+          {t.chat.saved}
+        </>
+      ) : (
+        <>
+          <BookmarkPlus className="size-3" />
+          {t.chat.saveAsNote}
+        </>
+      )}
+    </button>
   );
 }
