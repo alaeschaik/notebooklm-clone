@@ -89,20 +89,63 @@ export function groupTranscript(
   return spans;
 }
 
+/** The shape YouTube's timedtext endpoint returns for `fmt=json3`. */
+type Json3 = {
+  events?: { tStartMs?: number; segs?: { utf8?: string }[] }[];
+};
+
+/** Prefers the interface language, then English, then whatever exists. */
+function pickTrack<T extends { language_code?: string; base_url?: string }>(
+  tracks: T[],
+): T | undefined {
+  return (
+    tracks.find((track) => track.language_code === "en") ??
+    tracks.find((track) => track.language_code?.startsWith("en")) ??
+    tracks[0]
+  );
+}
+
+async function fetchCaptionTrack(baseUrl: string): Promise<TranscriptLine[]> {
+  const response = await fetch(`${baseUrl}&fmt=json3`, {
+    headers: { "user-agent": USER_AGENT },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) return [];
+
+  const body = await response.text();
+  // YouTube answers 200 with an empty body when it declines to serve captions
+  // to an unauthenticated client. That is not the same as "no captions", and
+  // the two need different advice.
+  if (body.trim().length === 0) return [];
+
+  let parsed: Json3;
+  try {
+    parsed = JSON.parse(body) as Json3;
+  } catch {
+    return [];
+  }
+
+  return (parsed.events ?? []).flatMap((event) => {
+    const text = (event.segs ?? []).map((seg) => seg.utf8 ?? "").join("").trim();
+    return text ? [{ startSeconds: (event.tStartMs ?? 0) / 1000, text }] : [];
+  });
+}
+
+const USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
 export async function extractYouTube(url: string): Promise<ExtractedDocument> {
   const videoId = parseVideoId(url);
   if (!videoId) {
     throw new IngestError("That does not look like a YouTube video URL.");
   }
 
-  const youtube = await Innertube.create({ retrieve_player: false }).catch(
-    (cause) => {
-      throw new IngestError(
-        "Could not reach YouTube. Please try again in a moment.",
-        { cause },
-      );
-    },
-  );
+  const youtube = await Innertube.create().catch((cause) => {
+    throw new IngestError(
+      "Could not reach YouTube. Please try again in a moment.",
+      { cause },
+    );
+  });
 
   const info = await youtube.getInfo(videoId).catch((cause) => {
     throw new IngestError(
@@ -111,31 +154,26 @@ export async function extractYouTube(url: string): Promise<ExtractedDocument> {
     );
   });
 
-  const transcriptInfo = await info.getTranscript().catch((cause) => {
-    throw new IngestError(
-      "This video has no transcript. YouTube only provides one when captions are enabled.",
-      { cause },
-    );
-  });
+  const title = cleanTitle(info.basic_info?.title, `YouTube video ${videoId}`);
+  const tracks = info.captions?.caption_tracks ?? [];
+  let lines: TranscriptLine[] = [];
 
-  const segments = transcriptInfo.transcript.content?.body?.initial_segments ?? [];
-  const lines: TranscriptLine[] = [];
+  // The caption-track endpoint is the more durable of the two: YouTube's
+  // get_transcript API changes shape often and is currently answering 400.
+  const track = pickTrack(tracks);
+  if (track?.base_url) {
+    lines = await fetchCaptionTrack(track.base_url).catch(() => []);
+  }
 
-  for (const segment of segments) {
-    // The list interleaves section headers with the actual caption segments.
-    if (!("snippet" in segment) || !("start_ms" in segment)) continue;
-    const text = segment.snippet?.text ?? "";
-    if (text) {
-      lines.push({
-        startSeconds: Number(segment.start_ms) / 1000,
-        text,
-      });
-    }
+  if (lines.length === 0) {
+    lines = await fetchViaTranscriptApi(info).catch(() => []);
   }
 
   if (lines.length === 0) {
     throw new IngestError(
-      "This video's transcript is empty. YouTube only provides one when captions are enabled.",
+      tracks.length > 0
+        ? `YouTube is refusing to release the transcript for "${title}". This is a restriction on their side, not a problem with the video — it has ${tracks.length} caption tracks. Open the transcript on YouTube and paste it in as a text source instead.`
+        : "This video has no captions, so there is no transcript to read. Paste the text in directly instead.",
     );
   }
 
@@ -144,6 +182,22 @@ export async function extractYouTube(url: string): Promise<ExtractedDocument> {
     builder.add(span.label, span.text, span.startSeconds);
   }
 
-  const title = cleanTitle(info.basic_info?.title, `YouTube video ${videoId}`);
   return builder.build(title);
+}
+
+/** Legacy path, kept because it still works for some videos. */
+async function fetchViaTranscriptApi(
+  info: Awaited<ReturnType<Innertube["getInfo"]>>,
+): Promise<TranscriptLine[]> {
+  const transcript = await info.getTranscript();
+  const segments = transcript.transcript.content?.body?.initial_segments ?? [];
+
+  return segments.flatMap((segment) => {
+    // The list interleaves section headers with the caption segments.
+    if (!("snippet" in segment) || !("start_ms" in segment)) return [];
+    const text = segment.snippet?.text ?? "";
+    return text
+      ? [{ startSeconds: Number(segment.start_ms) / 1000, text }]
+      : [];
+  });
 }
