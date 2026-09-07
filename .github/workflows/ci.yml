@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Route types are generated, not committed, so typecheck needs them first.
+      # `npm run typecheck` runs `next typegen` itself.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # The build must not need secrets: pages are dynamic and every client is
+      # constructed lazily, so a missing key is a runtime error, never a build
+      # one. If this step starts failing without env vars, that contract broke.
+      - name: Build
+        run: npm run build
