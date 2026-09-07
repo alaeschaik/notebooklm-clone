@@ -21,6 +21,7 @@ export function NotebookWorkspace({
   title,
   emoji,
   publicSlug,
+  origin,
   initialSources,
   initialMessages,
 }: {
@@ -28,6 +29,7 @@ export function NotebookWorkspace({
   title: string;
   emoji: string;
   publicSlug: string | null;
+  origin: string;
   initialSources: Source[];
   initialMessages: StoredMessage[];
 }) {
@@ -84,7 +86,11 @@ export function NotebookWorkspace({
         <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <ShareButton notebookId={notebookId} initialSlug={publicSlug} />
+          <ShareButton
+            notebookId={notebookId}
+            initialSlug={publicSlug}
+            origin={origin}
+          />
           <LocaleSwitcher />
           <IconButton
             title={t.studio.title}

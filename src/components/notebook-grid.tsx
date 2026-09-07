@@ -10,22 +10,14 @@ import { Button, IconButton } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm";
 import { EmptyState } from "@/components/ui/panel";
 import { Spinner } from "@/components/ui/spinner";
-import { useLocale, useT } from "@/lib/i18n/context";
+import { useT } from "@/lib/i18n/context";
 
 export function NotebookGrid({ initial }: { initial: NotebookSummary[] }) {
   const t = useT();
-  const locale = useLocale();
   const router = useRouter();
   const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-
-  const formatter = new Intl.DateTimeFormat(locale, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
   async function create() {
     setCreating(true);
@@ -93,7 +85,7 @@ export function NotebookGrid({ initial }: { initial: NotebookSummary[] }) {
                 <span className="mt-auto pt-4 text-xs text-fg-subtle">
                   {t.home.sourceCount(notebook.sourceCount)}
                   <span className="mx-1.5 opacity-50">·</span>
-                  {formatter.format(new Date(notebook.updatedAt))}
+                  {notebook.updatedLabel}
                 </span>
               </Link>
 

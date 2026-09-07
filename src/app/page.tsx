@@ -4,7 +4,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { NotebookGrid } from "@/components/notebook-grid";
 import { getDb } from "@/lib/db";
 import { notebooks, sources } from "@/lib/db/schema";
-import { getDictionary } from "@/lib/i18n/server";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { getVisitorId } from "@/lib/session-server";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,27 @@ export type NotebookSummary = {
   id: string;
   title: string;
   emoji: string;
-  updatedAt: string;
+  /**
+   * Pre-formatted on the server. Intl output differs between Node's ICU and
+   * the browser's for the same options — Node renders "Sep 5, 01:36 PM" where
+   * Chrome renders "Sep 5 at 01:36 PM" — so formatting this in a
+   * server-rendered client component is a guaranteed hydration mismatch.
+   */
+  updatedLabel: string;
   sourceCount: number;
 };
 
-async function listNotebooks(visitorId: string): Promise<NotebookSummary[]> {
+async function listNotebooks(
+  visitorId: string,
+  locale: string,
+): Promise<NotebookSummary[]> {
+  const formatter = new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   const rows = await getDb()
     .select({
       id: notebooks.id,
@@ -33,16 +49,19 @@ async function listNotebooks(visitorId: string): Promise<NotebookSummary[]> {
     .orderBy(desc(notebooks.updatedAt));
 
   return rows.map((row) => ({
-    ...row,
-    updatedAt: row.updatedAt.toISOString(),
+    id: row.id,
+    title: row.title,
+    emoji: row.emoji,
+    updatedLabel: formatter.format(row.updatedAt),
     sourceCount: Number(row.sourceCount),
   }));
 }
 
 export default async function Home() {
   const t = await getDictionary();
+  const locale = await getLocale();
   const visitorId = await getVisitorId();
-  const items = visitorId ? await listNotebooks(visitorId) : [];
+  const items = visitorId ? await listNotebooks(visitorId, locale) : [];
 
   return (
     <div className="flex flex-1 flex-col">

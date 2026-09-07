@@ -12,9 +12,13 @@ import { useT } from "@/lib/i18n/context";
 export function ShareButton({
   notebookId,
   initialSlug,
+  origin,
 }: {
   notebookId: string;
   initialSlug: string | null;
+  /** Supplied by the server: this component is server-rendered, where
+   * `window` does not exist. */
+  origin: string;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -22,9 +26,7 @@ export function ShareButton({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Built in the browser so the link matches whatever host the user is on,
-  // rather than depending on a configured base URL that drifts per environment.
-  const url = slug ? `${window.location.origin}/share/${slug}` : "";
+  const url = slug ? `${origin}/share/${slug}` : "";
 
   async function enable() {
     setBusy(true);

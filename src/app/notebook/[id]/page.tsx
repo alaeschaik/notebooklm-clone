@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { NotebookWorkspace } from "@/components/notebook-workspace";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, sources } from "@/lib/db/schema";
+import { getOrigin } from "@/lib/origin";
 import { getVisitorId } from "@/lib/session-server";
 import type { Source, StoredMessage } from "@/lib/types";
 
@@ -70,6 +71,7 @@ export default async function NotebookPage(
       title={notebook.title}
       emoji={notebook.emoji}
       publicSlug={notebook.publicSlug}
+      origin={await getOrigin()}
       initialSources={initialSources}
       initialMessages={initialMessages}
     />
