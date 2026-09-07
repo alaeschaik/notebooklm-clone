@@ -53,6 +53,19 @@ export async function fetchPage(
 }
 
 /**
+ * Strips reference furniture that reads as content once the markup is gone.
+ *
+ * Wikipedia is the obvious case: "[80]", "[citation needed]" and "[edit]" are
+ * navigational in the page but become part of the sentence in plain text, and
+ * then get quoted back inside citations.
+ */
+function stripReferenceMarkers(text: string): string {
+  return text
+    .replace(/\[\s*(?:\d{1,3}|edit|citation needed|note \d+|[a-z])\s*\]/gi, "")
+    .replace(/[ \t]{2,}/g, " ");
+}
+
+/**
  * Turns an article into labelled sections using its headings, so a citation can
  * report which section it came from the way a PDF citation reports a page.
  */
@@ -71,7 +84,7 @@ function addSections(builder: DocumentBuilder, html: string): void {
   };
 
   for (const block of blocks) {
-    const text = (block.textContent ?? "").trim();
+    const text = stripReferenceMarkers(block.textContent ?? "").trim();
     if (!text) continue;
 
     if (/^H[1-4]$/.test(block.tagName)) {
@@ -120,3 +133,6 @@ export async function extractWeb(url: string): Promise<ExtractedDocument> {
 
   return builder.build(cleanTitle(article?.title, fallbackTitle));
 }
+
+/** Exposed for tests; not part of the module's public surface. */
+export const __testing = { stripReferenceMarkers };
