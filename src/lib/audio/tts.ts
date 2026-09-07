@@ -68,6 +68,16 @@ function isRateLimit(error: unknown): boolean {
   return message.includes("429") || /quota|rate limit/i.test(message);
 }
 
+/**
+ * A per-day quota does not clear within the life of a request, so retrying
+ * against it only burns the remaining attempts and delays an error the user
+ * needs to see. Per-minute limits do clear, and are worth waiting out.
+ */
+function isDailyQuota(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /PerDay|per day|free_tier_requests/i.test(message);
+}
+
 /** Renders one run of dialogue turns to raw PCM samples. */
 export async function renderSegment(
   turns: DialogueTurn[],
@@ -110,18 +120,26 @@ export async function renderSegment(
       };
     } catch (error) {
       lastError = error;
-      // Only rate limits are worth retrying; a rejected request will be
-      // rejected again just as fast.
-      if (!isRateLimit(error) || attempt === MAX_ATTEMPTS) break;
+      // Only transient rate limits are worth retrying; a rejected request, or
+      // an exhausted daily allowance, will fail again just as fast.
+      const worthRetrying = isRateLimit(error) && !isDailyQuota(error);
+      if (!worthRetrying || attempt === MAX_ATTEMPTS) break;
       await sleep(BACKOFF_MS * attempt);
     }
   }
 
   const detail = lastError instanceof Error ? lastError.message : String(lastError);
+  if (isDailyQuota(lastError)) {
+    throw new TtsError(
+      "Gemini's free tier allows only 10 text-to-speech requests per day, and that allowance is used up. Enable billing on the Gemini API, or try again tomorrow.",
+      { cause: lastError, retryable: false },
+    );
+  }
+
   const rateLimited = isRateLimit(lastError);
   throw new TtsError(
     rateLimited
-      ? "Gemini's free speech quota is temporarily exhausted — it allows only a few requests per minute."
+      ? "Gemini's speech quota is temporarily exhausted — it allows only a few requests per minute."
       : `The speech service could not render this segment: ${detail}`,
     { cause: lastError, retryable: rateLimited },
   );

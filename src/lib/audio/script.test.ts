@@ -15,7 +15,7 @@ describe("segmentScript", () => {
   });
 
   it("keeps a short script in one segment", () => {
-    const segments = segmentScript([turn(0), turn(1)], 1500);
+    const segments = segmentScript([turn(0), turn(1)], 2500);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toMatchObject({ idx: 0, turnStart: 0, turnEnd: 2 });
   });

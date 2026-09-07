@@ -13,11 +13,14 @@ export const HOSTS = [
 /**
  * Characters of dialogue rendered per TTS request.
  *
- * Well below the model's input limit on purpose: voice consistency drifts over
- * long single generations, and short requests also keep each call far inside
- * the platform's function timeout so progress survives a slow one.
+ * This trades off two opposing limits. Voice consistency drifts over long
+ * single generations, which argues for small segments — but Gemini's free tier
+ * allows only ten TTS requests *per day*, so a script split into six segments
+ * spends most of a day's quota on one overview. At 2500 characters a typical
+ * script is two requests, which stays well inside the model's context window
+ * and keeps each generation short enough to hold a voice steady.
  */
-export const SEGMENT_MAX_CHARS = 1500;
+export const SEGMENT_MAX_CHARS = 2500;
 
 export function normaliseSpeaker(speaker: string): string {
   const match = HOSTS.find(
