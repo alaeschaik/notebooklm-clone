@@ -21,6 +21,30 @@ export const en = {
     copy: "Copy",
     copied: "Copied",
     save: "Save",
+    confirm: "Confirm",
+    remove: "Remove",
+    open: "Open",
+    empty: "Nothing here yet",
+  },
+
+  confirm: {
+    deleteNotebook: {
+      title: "Delete this notebook?",
+      message:
+        "Its sources, conversation, notes and generated documents are deleted with it. This cannot be undone.",
+      action: "Delete notebook",
+    },
+    deleteSource: {
+      title: "Remove this source?",
+      message:
+        "It will no longer be available to answer questions, and existing citations pointing at it will stop resolving.",
+      action: "Remove source",
+    },
+    clearChat: {
+      title: "Delete this conversation?",
+      message: "Your sources and notes are kept. Only the messages are removed.",
+      action: "Delete conversation",
+    },
   },
 
   home: {
@@ -31,7 +55,8 @@ export const en = {
     empty: "No notebooks yet. Create one to get started.",
     sourceCount: (n: number) => (n === 1 ? "1 source" : `${n} sources`),
     updated: "Updated",
-    deleteConfirm: "Delete this notebook and everything in it?",
+    untitled: "Untitled notebook",
+    open: "Open notebook",
   },
 
   sources: {
@@ -47,7 +72,6 @@ export const en = {
       ready: "Ready",
       failed: "Failed",
     },
-    deleteConfirm: "Remove this source from the notebook?",
     dialog: {
       title: "Add a source",
       upload: "Upload",
@@ -84,7 +108,8 @@ export const en = {
     contextFull: "Reading all sources in full",
     contextRetrieval: (n: number) => `Searched ${n} passages`,
     clear: "Clear conversation",
-    clearConfirm: "Delete this entire conversation?",
+    you: "You",
+    assistant: "Notebook",
   },
 
   studio: {
@@ -97,7 +122,9 @@ export const en = {
       `Recording ${done} of ${total}`,
     audioReady: "Ready to play",
     audioFailed: "Generation failed",
+    audioWaiting: "Waiting for the speech quota to reset…",
     transcript: "Transcript",
+    hideTranscript: "Hide transcript",
     docs: "Documents",
     mindMap: "Mind map",
     mindMapHint: "How the ideas in your sources connect.",
@@ -156,6 +183,30 @@ export const de: Dictionary = {
     copy: "Kopieren",
     copied: "Kopiert",
     save: "Speichern",
+    confirm: "Bestätigen",
+    remove: "Entfernen",
+    open: "Öffnen",
+    empty: "Noch nichts vorhanden",
+  },
+
+  confirm: {
+    deleteNotebook: {
+      title: "Dieses Notizbuch löschen?",
+      message:
+        "Quellen, Unterhaltung, Notizen und erzeugte Dokumente werden mitgelöscht. Das lässt sich nicht rückgängig machen.",
+      action: "Notizbuch löschen",
+    },
+    deleteSource: {
+      title: "Diese Quelle entfernen?",
+      message:
+        "Sie steht dann nicht mehr für Antworten zur Verfügung, und vorhandene Zitate darauf lassen sich nicht mehr auflösen.",
+      action: "Quelle entfernen",
+    },
+    clearChat: {
+      title: "Diese Unterhaltung löschen?",
+      message: "Quellen und Notizen bleiben erhalten. Nur die Nachrichten werden entfernt.",
+      action: "Unterhaltung löschen",
+    },
   },
 
   home: {
@@ -166,7 +217,8 @@ export const de: Dictionary = {
     empty: "Noch keine Notizbücher. Erstelle eines, um zu beginnen.",
     sourceCount: (n: number) => (n === 1 ? "1 Quelle" : `${n} Quellen`),
     updated: "Aktualisiert",
-    deleteConfirm: "Dieses Notizbuch und seinen gesamten Inhalt löschen?",
+    untitled: "Unbenanntes Notizbuch",
+    open: "Notizbuch öffnen",
   },
 
   sources: {
@@ -183,7 +235,6 @@ export const de: Dictionary = {
       ready: "Bereit",
       failed: "Fehlgeschlagen",
     },
-    deleteConfirm: "Diese Quelle aus dem Notizbuch entfernen?",
     dialog: {
       title: "Quelle hinzufügen",
       upload: "Hochladen",
@@ -221,7 +272,8 @@ export const de: Dictionary = {
     contextFull: "Alle Quellen werden vollständig gelesen",
     contextRetrieval: (n: number) => `${n} Textstellen durchsucht`,
     clear: "Unterhaltung löschen",
-    clearConfirm: "Diese gesamte Unterhaltung löschen?",
+    you: "Du",
+    assistant: "Notizbuch",
   },
 
   studio: {
@@ -234,7 +286,9 @@ export const de: Dictionary = {
       `Aufnahme ${done} von ${total}`,
     audioReady: "Bereit zum Abspielen",
     audioFailed: "Erstellung fehlgeschlagen",
+    audioWaiting: "Warte auf das Zurücksetzen des Sprachkontingents…",
     transcript: "Transkript",
+    hideTranscript: "Transkript ausblenden",
     docs: "Dokumente",
     mindMap: "Mindmap",
     mindMapHint: "Wie die Ideen in deinen Quellen zusammenhängen.",

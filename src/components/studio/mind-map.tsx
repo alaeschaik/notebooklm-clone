@@ -4,6 +4,7 @@ import { ChevronRight, Network, Sparkles } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
 
+import { StudioCard } from "@/components/studio/studio-card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -125,12 +126,11 @@ export function MindMapCard({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface-2 p-3">
-      <div className="flex items-center gap-2">
-        <Network className="size-4 text-accent" />
-        <h3 className="text-[13px] font-semibold">{t.studio.mindMap}</h3>
-      </div>
-
+    <StudioCard
+      icon={<Network className="size-3.5" />}
+      title={t.studio.mindMap}
+      hint={map?.status === "ready" ? undefined : t.studio.mindMapHint}
+    >
       {map?.status === "ready" && map.data ? (
         <div className="mt-2 flex items-center gap-2">
           <Button size="sm" className="flex-1" onClick={() => setOpen(true)}>
@@ -150,9 +150,10 @@ export function MindMapCard({
         </p>
       ) : (
         <>
-          <p className="mt-1 text-xs text-fg-subtle">{t.studio.mindMapHint}</p>
           {map?.status === "failed" && (
-            <p className="mt-1.5 text-xs text-danger">{map.error}</p>
+            <p className="mt-1.5 rounded-md bg-danger-soft px-2 py-1.5 text-xs leading-snug text-danger">
+              {map.error}
+            </p>
           )}
           <Button
             size="sm"
@@ -185,6 +186,6 @@ export function MindMapCard({
           </ul>
         )}
       </Dialog>
-    </section>
+    </StudioCard>
   );
 }

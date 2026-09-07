@@ -4,6 +4,8 @@ import { AlertCircle, Headphones, RotateCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 
+import { AudioPlayer } from "@/components/studio/audio-player";
+import { StudioCard } from "@/components/studio/studio-card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { fetcher } from "@/hooks/use-api";
@@ -44,11 +46,11 @@ export function AudioOverviewCard({
   /**
    * Renders one segment per request until the overview finishes.
    *
-   * The work is paced from here rather than run server-side in one go because
-   * free-tier speech synthesis is rate limited per minute: a full overview
-   * spends most of its time waiting, which would blow a serverless function's
-   * time limit. Driving it from the client also makes each step's progress
-   * visible instead of the user watching a spinner for five minutes.
+   * Paced from here rather than run server-side in one pass because free-tier
+   * speech synthesis is rate limited per minute: a full overview spends most of
+   * its wall clock waiting, which would exceed a serverless function's ceiling.
+   * Driving it from the client also makes each step visible instead of leaving
+   * the user watching one spinner for five minutes.
    */
   const drive = useCallback(async () => {
     if (driving.current) return;
@@ -60,6 +62,7 @@ export function AudioOverviewCard({
           { method: "POST" },
         );
         if (!response.ok) break;
+
         const next = (await response.json()) as {
           audio: AudioOverview | null;
           retryAfterMs?: number;
@@ -68,7 +71,7 @@ export function AudioOverviewCard({
         if (next.audio?.status !== "running") break;
 
         // The server asks for a pause when a segment hit a rate limit; retrying
-        // immediately would just burn the next attempt on the same quota.
+        // at once would spend the next attempt on the same exhausted quota.
         if (next.retryAfterMs) {
           await new Promise((resolve) => setTimeout(resolve, next.retryAfterMs));
         }
@@ -78,20 +81,14 @@ export function AudioOverviewCard({
     }
   }, [notebookId, mutate]);
 
-  // Resumes a run that was interrupted by a reload.
+  // Resumes a run interrupted by a reload.
   useEffect(() => {
     if (audio?.status === "running" && audio.segments?.length) void drive();
   }, [audio?.status, audio?.segments?.length, drive]);
-  const running = audio?.status === "running" || audio?.status === "pending";
-  const segments = audio?.segments ?? [];
-  const done = segments.filter((segment) => segment.status === "ready").length;
-  // A segment that is retrying still has something worth telling the user.
-  const waiting = segments.find(
-    (segment) => segment.status === "pending" && (segment.attempts ?? 0) > 0,
-  );
 
   async function generate() {
     setStarting(true);
+    setShowTranscript(false);
     try {
       const response = await fetch(`/api/notebooks/${notebookId}/audio`, {
         method: "POST",
@@ -99,34 +96,47 @@ export function AudioOverviewCard({
         body: JSON.stringify({ sourceIds: selectedIds }),
       });
       const next = (await response.json()) as { audio: AudioOverview | null };
-      await mutate(next, false);
+      await mutate({ audio: next.audio }, false);
       if (next.audio?.status === "running") void drive();
     } finally {
       setStarting(false);
     }
   }
 
-  return (
-    <section className="rounded-xl border border-border bg-surface-2 p-3">
-      <div className="flex items-center gap-2">
-        <Headphones className="size-4 text-accent" />
-        <h3 className="text-[13px] font-semibold">{t.studio.audio}</h3>
-      </div>
+  const segments = audio?.segments ?? [];
+  const done = segments.filter((segment) => segment.status === "ready").length;
+  const running = audio?.status === "running" || audio?.status === "pending";
+  const waiting = segments.find(
+    (segment) => segment.status === "pending" && (segment.attempts ?? 0) > 0,
+  );
 
-      {!audio && (
-        <>
-          <p className="mt-1 text-xs text-fg-subtle">{t.studio.audioHint}</p>
-          <Button
-            variant="primary"
-            size="sm"
-            className="mt-2.5 w-full"
+  return (
+    <StudioCard
+      icon={<Headphones className="size-3.5" />}
+      title={t.studio.audio}
+      hint={!audio ? t.studio.audioHint : undefined}
+      actions={
+        audio?.status === "ready" ? (
+          <button
             onClick={generate}
-            disabled={disabled || starting}
+            className="rounded px-1 text-[11px] text-fg-subtle transition-colors hover:text-fg"
           >
-            {starting ? <Spinner /> : <Sparkles className="size-3.5" />}
-            {t.studio.audioGenerate}
-          </Button>
-        </>
+            {t.common.regenerate}
+          </button>
+        ) : null
+      }
+    >
+      {!audio && (
+        <Button
+          variant="primary"
+          size="sm"
+          className="mt-2.5 w-full"
+          onClick={generate}
+          disabled={disabled || starting}
+        >
+          {starting ? <Spinner /> : <Sparkles className="size-3.5" />}
+          {t.studio.audioGenerate}
+        </Button>
       )}
 
       {running && (
@@ -137,18 +147,23 @@ export function AudioOverviewCard({
               ? t.studio.audioGenerating
               : t.studio.audioRendering(done, segments.length)}
           </p>
-          {waiting?.error && (
-            <p className="mt-1.5 text-xs text-warning">{waiting.error}</p>
+
+          {waiting && (
+            <p className="mt-1.5 rounded-md bg-warning-soft px-2 py-1.5 text-[11px] leading-snug text-warning">
+              {t.studio.audioWaiting}
+            </p>
           )}
+
           {segments.length > 0 && (
             <div
               role="progressbar"
               aria-valuenow={done}
+              aria-valuemin={0}
               aria-valuemax={segments.length}
               className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3"
             >
               <div
-                className="h-full bg-accent transition-[width] duration-500"
+                className="h-full rounded-full bg-accent transition-[width] duration-500"
                 style={{ width: `${(done / segments.length) * 100}%` }}
               />
             </div>
@@ -158,8 +173,8 @@ export function AudioOverviewCard({
 
       {audio?.status === "failed" && (
         <div className="mt-2.5">
-          <p className="flex items-start gap-1.5 text-xs text-danger">
-            <AlertCircle className="mt-px size-3 shrink-0" />
+          <p className="flex items-start gap-1.5 rounded-md bg-danger-soft px-2 py-1.5 text-xs leading-snug text-danger">
+            <AlertCircle className="mt-0.5 size-3 shrink-0" />
             {audio.error ?? t.studio.audioFailed}
           </p>
           <Button size="sm" className="mt-2 w-full" onClick={generate}>
@@ -170,39 +185,34 @@ export function AudioOverviewCard({
       )}
 
       {audio?.status === "ready" && audio.audioUrl && (
-        <div className="mt-2.5 space-y-2">
-          {/* The native player gives scrubbing, volume and keyboard control
-              for free, and matches whatever the listener's OS already does. */}
-          <audio controls preload="metadata" src={audio.audioUrl} className="w-full" />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowTranscript((value) => !value)}
-              className="text-xs font-medium text-accent hover:underline"
-            >
-              {t.studio.transcript}
-            </button>
-            <button
-              onClick={generate}
-              className="ml-auto text-xs text-fg-subtle hover:text-fg"
-            >
-              {t.common.regenerate}
-            </button>
-          </div>
+        <div className="mt-2.5">
+          <AudioPlayer src={audio.audioUrl} />
 
-          {showTranscript && audio.script && (
-            <ol className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg bg-surface p-2.5">
-              {audio.script.map((turn, index) => (
-                <li key={index} className="text-xs leading-relaxed">
-                  <span className="font-semibold text-accent">
-                    {turn.speaker}
-                  </span>{" "}
-                  <span className="text-fg-muted">{turn.text}</span>
-                </li>
-              ))}
-            </ol>
+          {audio.script && (
+            <>
+              <button
+                onClick={() => setShowTranscript((value) => !value)}
+                className="mt-2 rounded px-1 text-xs font-medium text-accent hover:underline"
+              >
+                {showTranscript ? t.studio.hideTranscript : t.studio.transcript}
+              </button>
+
+              {showTranscript && (
+                <ol className="mt-1.5 max-h-72 space-y-2 overflow-y-auto rounded-lg bg-surface-2 p-2.5">
+                  {audio.script.map((turn, index) => (
+                    <li key={index} className="text-xs leading-relaxed">
+                      <span className="font-semibold text-accent">
+                        {turn.speaker}
+                      </span>
+                      <span className="text-fg-muted"> {turn.text}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
           )}
         </div>
       )}
-    </section>
+    </StudioCard>
   );
 }

@@ -1,14 +1,16 @@
 "use client";
 
-import { AlertCircle, Check, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Library, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { AddSourceDialog } from "@/components/sources/add-source-dialog";
 import { SourceIcon } from "@/components/sources/source-icon";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm";
+import { EmptyState, Panel, PanelBody } from "@/components/ui/panel";
 import { Spinner } from "@/components/ui/spinner";
-import { useT } from "@/lib/i18n/context";
 import { cn } from "@/lib/cn";
+import { useT } from "@/lib/i18n/context";
 import type { Source } from "@/lib/types";
 
 export function SourcesPanel({
@@ -29,6 +31,7 @@ export function SourcesPanel({
   onChanged: () => void;
 }) {
   const t = useT();
+  const confirm = useConfirm();
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -36,7 +39,15 @@ export function SourcesPanel({
   const allSelected = ready.length > 0 && selected.length === ready.length;
 
   async function remove(id: string) {
-    if (!confirm(t.sources.deleteConfirm)) return;
+    const ok = await confirm({
+      title: t.confirm.deleteSource.title,
+      message: t.confirm.deleteSource.message,
+      confirmLabel: t.confirm.deleteSource.action,
+      cancelLabel: t.common.cancel,
+      destructive: true,
+    });
+    if (!ok) return;
+
     setRemoving(id);
     try {
       await fetch(`/api/sources/${id}`, { method: "DELETE" });
@@ -47,36 +58,44 @@ export function SourcesPanel({
   }
 
   return (
-    <>
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
-        <h2 className="text-sm font-semibold">{t.sources.title}</h2>
+    <Panel
+      title={t.sources.title}
+      actions={
         <Button size="sm" onClick={() => setAdding(true)}>
           <Plus className="size-3.5" />
           {t.common.add}
         </Button>
-      </div>
-
+      }
+    >
       {ready.length > 0 && (
         <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-xs text-fg-subtle">
+          <span className="text-xs tabular-nums text-fg-subtle">
             {t.sources.selectedCount(selected.length, ready.length)}
           </span>
           <button
             onClick={() => onToggleAll(!allSelected)}
-            className="text-xs font-medium text-accent hover:underline"
+            className="rounded px-1 text-xs font-medium text-accent hover:underline"
           >
             {allSelected ? t.sources.deselectAll : t.sources.selectAll}
           </button>
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <PanelBody className="p-2">
         {sources.length === 0 ? (
-          <p className="px-3 py-10 text-center text-sm text-fg-subtle">
-            {t.sources.empty}
-          </p>
+          <EmptyState
+            icon={<Library className="size-5" />}
+            title={t.sources.title}
+            description={t.sources.empty}
+            action={
+              <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
+                <Plus className="size-3.5" />
+                {t.sources.add}
+              </Button>
+            }
+          />
         ) : (
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {sources.map((source) => {
               const isReady = source.status === "ready";
               const isSelected = selected.includes(source.id);
@@ -94,13 +113,14 @@ export function SourcesPanel({
                     <button
                       onClick={() => isReady && onToggle(source.id)}
                       disabled={!isReady}
+                      role="checkbox"
+                      aria-checked={isSelected}
                       aria-label={source.title}
-                      aria-pressed={isSelected}
                       className={cn(
-                        "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                        "mt-px flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
                         isSelected
                           ? "border-accent bg-accent text-accent-fg"
-                          : "border-border-strong bg-surface",
+                          : "border-border-strong bg-surface hover:border-accent",
                         !isReady && "opacity-40",
                       )}
                     >
@@ -110,22 +130,22 @@ export function SourcesPanel({
                     <button
                       onClick={() => isReady && onOpen(source.id)}
                       disabled={!isReady}
-                      className="min-w-0 flex-1 text-left"
+                      className="min-w-0 flex-1 text-left disabled:cursor-default"
                     >
                       <span className="flex items-center gap-1.5">
                         <SourceIcon
                           kind={source.kind}
                           className="size-3.5 shrink-0 text-fg-subtle"
                         />
-                        <span className="truncate text-[13px] font-medium">
+                        <span className="truncate text-[13px] leading-5 font-medium">
                           {source.title}
                         </span>
                       </span>
 
                       {source.status === "failed" ? (
-                        <span className="mt-1 flex items-start gap-1 text-xs text-danger">
-                          <AlertCircle className="mt-px size-3 shrink-0" />
-                          <span className="line-clamp-3">{source.error}</span>
+                        <span className="mt-1 flex items-start gap-1.5 rounded-md bg-danger-soft px-1.5 py-1 text-xs leading-snug text-danger">
+                          <AlertCircle className="mt-0.5 size-3 shrink-0" />
+                          <span className="line-clamp-4">{source.error}</span>
                         </span>
                       ) : isReady ? null : (
                         <span className="mt-1 flex items-center gap-1.5 text-xs text-fg-subtle">
@@ -135,24 +155,25 @@ export function SourcesPanel({
                       )}
                     </button>
 
-                    <button
+                    <IconButton
+                      title={t.common.delete}
+                      size="icon-sm"
                       onClick={() => remove(source.id)}
-                      aria-label={t.common.delete}
-                      className="rounded p-1 text-fg-subtle opacity-0 transition group-hover:opacity-100 hover:bg-danger-soft hover:text-danger focus-visible:opacity-100"
+                      className="-mr-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-danger-soft hover:text-danger"
                     >
                       {removing === source.id ? (
                         <Spinner className="size-3" />
                       ) : (
                         <Trash2 className="size-3" />
                       )}
-                    </button>
+                    </IconButton>
                   </div>
                 </li>
               );
             })}
           </ul>
         )}
-      </div>
+      </PanelBody>
 
       <AddSourceDialog
         notebookId={notebookId}
@@ -160,6 +181,6 @@ export function SourcesPanel({
         onClose={() => setAdding(false)}
         onAdded={onChanged}
       />
-    </>
+    </Panel>
   );
 }

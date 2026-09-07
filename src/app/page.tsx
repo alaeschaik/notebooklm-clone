@@ -1,7 +1,7 @@
 import { count, desc, eq } from "drizzle-orm";
 
-import { NotebookGrid } from "@/components/notebook-grid";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { NotebookGrid } from "@/components/notebook-grid";
 import { getDb } from "@/lib/db";
 import { notebooks, sources } from "@/lib/db/schema";
 import { getDictionary } from "@/lib/i18n/server";
@@ -45,20 +45,34 @@ export default async function Home() {
   const items = visitorId ? await listNotebooks(visitorId) : [];
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-10">
-      <header className="mb-10 flex items-start justify-between gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {t.home.heading}
-          </h1>
-          <p className="mt-1.5 max-w-xl text-sm text-fg-muted">
-            {t.home.subheading}
-          </p>
+    <div className="flex flex-1 flex-col">
+      <header className="sticky top-0 z-10 border-b border-border bg-bg/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-6">
+          <span
+            aria-hidden
+            className="flex size-6 items-center justify-center rounded-md bg-accent text-[11px] font-bold text-accent-fg"
+          >
+            N
+          </span>
+          <span className="text-sm font-semibold tracking-tight">{t.appName}</span>
+          <div className="ml-auto">
+            <LocaleSwitcher />
+          </div>
         </div>
-        <LocaleSwitcher />
       </header>
 
-      <NotebookGrid initial={items} />
+      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
+        <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
+          {t.home.heading}
+        </h1>
+        <p className="mt-2 max-w-lg text-sm leading-relaxed text-fg-muted">
+          {t.home.subheading}
+        </p>
+
+        <div className="mt-8">
+          <NotebookGrid initial={items} />
+        </div>
+      </div>
     </div>
   );
 }

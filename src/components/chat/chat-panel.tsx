@@ -1,9 +1,20 @@
 "use client";
 
-import { ArrowUp, BookmarkPlus, Check, Square, Trash2 } from "lucide-react";
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { ArrowUp, BookmarkPlus, Check, MessagesSquare, Square, Trash2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 
 import { Answer } from "@/components/chat/answer";
+import { Suggestions } from "@/components/chat/suggestions";
+import { IconButton } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm";
+import { EmptyState, Panel, PanelBody } from "@/components/ui/panel";
 import { Spinner } from "@/components/ui/spinner";
 import { useMessages } from "@/hooks/use-api";
 import { cn } from "@/lib/cn";
@@ -24,10 +35,6 @@ type ChatEvent =
   | { type: "done"; messageId: string }
   | { type: "error"; message: string };
 
-/** Lets the studio drop a question into the composer without lifting the
- * composer's state out of this component. */
-export type ChatHandle = { ask: (question: string) => void };
-
 type Streaming = {
   question: string;
   text: string;
@@ -37,21 +44,28 @@ type Streaming = {
   documents: number;
 };
 
+/** Lets the studio drop a question into the composer without lifting the
+ * composer's state out of this component. */
+export type ChatHandle = { ask: (question: string) => void };
+
 export function ChatPanel({
   notebookId,
   sources,
   selectedIds,
   onCitationClick,
+  initialMessages,
   ref,
 }: {
   notebookId: string;
   sources: Source[];
   selectedIds: string[];
   onCitationClick: (target: HighlightTarget) => void;
+  initialMessages?: StoredMessage[];
   ref?: Ref<ChatHandle>;
 }) {
   const t = useT();
-  const { messages, mutate } = useMessages(notebookId);
+  const confirm = useConfirm();
+  const { messages, mutate } = useMessages(notebookId, initialMessages);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState<Streaming | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,10 +76,6 @@ export function ChatPanel({
   const hasReadySource = sources.some((source) => source.status === "ready");
   const canSend = input.trim().length > 0 && selectedIds.length > 0 && !streaming;
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, streaming?.text]);
-
   useImperativeHandle(ref, () => ({
     ask: (question: string) => {
       setInput(question);
@@ -73,119 +83,149 @@ export function ChatPanel({
     },
   }), []);
 
-  async function send() {
-    const question = input.trim();
-    if (!question || selectedIds.length === 0) return;
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  }, [messages.length, streaming?.text]);
 
-    setInput("");
-    setError(null);
-    setStreaming({
-      question,
-      text: "",
-      citations: [],
-      markers: [],
-      mode: null,
-      documents: 0,
-    });
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const response = await fetch(`/api/notebooks/${notebookId}/chat`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question, sourceIds: selectedIds }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok || !response.body) {
-        const body = (await response.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        setError(body.error ?? t.errors.generic);
-        setStreaming(null);
-        return;
-      }
-
-      for await (const event of readEventStream<ChatEvent>(
-        response.body,
-        controller.signal,
-      )) {
-        if (event.type === "start") {
-          setStreaming((s) =>
-            s ? { ...s, mode: event.mode, documents: event.documents } : s,
-          );
-        } else if (event.type === "text") {
-          setStreaming((s) => (s ? { ...s, text: s.text + event.text } : s));
-        } else if (event.type === "citation") {
-          setStreaming((s) =>
-            s
-              ? {
-                  ...s,
-                  markers: [
-                    ...s.markers,
-                    { position: event.position, index: event.citation.index },
-                  ],
-                  citations: s.citations.some(
-                    (c) => c.index === event.citation.index,
-                  )
-                    ? s.citations
-                    : [...s.citations, event.citation],
-                }
-              : s,
-          );
-        } else if (event.type === "error") {
-          setError(event.message);
-        }
-      }
-
-      await mutate();
-    } catch (cause) {
-      // Aborting is a user action, not a failure worth reporting.
-      if (!(cause instanceof DOMException && cause.name === "AbortError")) {
-        setError(t.errors.network);
-      }
-      await mutate();
-    } finally {
-      setStreaming(null);
-      abortRef.current = null;
-    }
+  /** Grows the composer with its content, up to a cap. */
+  function resize(element: HTMLTextAreaElement) {
+    element.style.height = "auto";
+    element.style.height = `${Math.min(element.scrollHeight, 176)}px`;
   }
 
+  const send = useCallback(
+    async (question: string) => {
+      if (!question.trim() || selectedIds.length === 0) return;
+
+      setInput("");
+      if (inputRef.current) inputRef.current.style.height = "auto";
+      setError(null);
+      setStreaming({
+        question,
+        text: "",
+        citations: [],
+        markers: [],
+        mode: null,
+        documents: 0,
+      });
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const response = await fetch(`/api/notebooks/${notebookId}/chat`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ question, sourceIds: selectedIds }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          const body = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setError(body.error ?? t.errors.generic);
+          setStreaming(null);
+          return;
+        }
+
+        for await (const event of readEventStream<ChatEvent>(
+          response.body,
+          controller.signal,
+        )) {
+          if (event.type === "start") {
+            setStreaming((s) =>
+              s ? { ...s, mode: event.mode, documents: event.documents } : s,
+            );
+          } else if (event.type === "text") {
+            setStreaming((s) => (s ? { ...s, text: s.text + event.text } : s));
+          } else if (event.type === "citation") {
+            setStreaming((s) =>
+              s
+                ? {
+                    ...s,
+                    markers: [
+                      ...s.markers,
+                      { position: event.position, index: event.citation.index },
+                    ],
+                    citations: s.citations.some(
+                      (c) => c.index === event.citation.index,
+                    )
+                      ? s.citations
+                      : [...s.citations, event.citation],
+                  }
+                : s,
+            );
+          } else if (event.type === "error") {
+            setError(event.message);
+          }
+        }
+
+        await mutate();
+      } catch (cause) {
+        // Aborting is a user action, not a failure worth reporting.
+        if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+          setError(t.errors.network);
+        }
+        await mutate();
+      } finally {
+        setStreaming(null);
+        abortRef.current = null;
+      }
+    },
+    [notebookId, selectedIds, mutate, t],
+  );
+
   async function clearConversation() {
-    if (!confirm(t.chat.clearConfirm)) return;
+    const ok = await confirm({
+      title: t.confirm.clearChat.title,
+      message: t.confirm.clearChat.message,
+      confirmLabel: t.confirm.clearChat.action,
+      cancelLabel: t.common.cancel,
+      destructive: true,
+    });
+    if (!ok) return;
     await fetch(`/api/notebooks/${notebookId}/messages`, { method: "DELETE" });
     await mutate();
   }
 
   return (
-    <>
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
-        <h2 className="text-sm font-semibold">{t.chat.title}</h2>
-        {messages.length > 0 && (
-          <button
+    <Panel
+      title={t.chat.title}
+      actions={
+        messages.length > 0 ? (
+          <IconButton
+            title={t.chat.clear}
+            size="icon-sm"
             onClick={clearConversation}
-            aria-label={t.chat.clear}
-            className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <Trash2 className="size-3.5" />
-          </button>
-        )}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto max-w-2xl space-y-6">
+          </IconButton>
+        ) : null
+      }
+    >
+      <PanelBody className="px-4 py-6">
+        <div className="mx-auto max-w-[46rem] space-y-7">
           {messages.length === 0 && !streaming && (
-            <p className="py-16 text-center text-sm text-fg-subtle">
-              {hasReadySource ? t.chat.empty : t.chat.emptyNoSources}
-            </p>
+            <>
+              <EmptyState
+                icon={<MessagesSquare className="size-5" />}
+                title={hasReadySource ? t.chat.empty : t.chat.emptyNoSources}
+              />
+              {hasReadySource && selectedIds.length > 0 && (
+                <Suggestions
+                  notebookId={notebookId}
+                  sourceIds={selectedIds}
+                  onPick={(question) => void send(question)}
+                />
+              )}
+            </>
           )}
 
           {messages.map((message) =>
             message.role === "user" ? (
               <div key={message.id} className="flex justify-end">
-                <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-accent-soft px-3.5 py-2 text-[15px] text-fg">
+                <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-relaxed text-fg">
                   {message.content}
                 </p>
               </div>
@@ -210,13 +250,13 @@ export function ChatPanel({
           {streaming && (
             <>
               <div className="flex justify-end">
-                <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-accent-soft px-3.5 py-2 text-[15px] text-fg">
+                <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-relaxed text-fg">
                   {streaming.question}
                 </p>
               </div>
               <div className="animate-fade-in">
                 {streaming.mode && (
-                  <p className="mb-2 text-xs text-fg-subtle">
+                  <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-fg-subtle">
                     {streaming.mode === "full"
                       ? t.chat.contextFull
                       : t.chat.contextRetrieval(streaming.documents)}
@@ -240,62 +280,65 @@ export function ChatPanel({
           )}
 
           {error && (
-            <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+            <p className="rounded-lg border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger">
               {error}
             </p>
           )}
 
           <div ref={bottomRef} />
         </div>
-      </div>
+      </PanelBody>
 
-      <div className="shrink-0 border-t border-border p-3">
-        <div className="mx-auto max-w-2xl">
+      <div className="shrink-0 border-t border-border bg-surface px-4 py-3">
+        <div className="mx-auto max-w-[46rem]">
           {selectedIds.length === 0 && hasReadySource && (
-            <p className="mb-2 text-xs text-warning">
-              {t.chat.noSourcesSelected}
-            </p>
+            <p className="mb-2 text-xs text-warning">{t.chat.noSourcesSelected}</p>
           )}
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void send();
+              if (canSend) void send(input.trim());
             }}
-            className="flex items-end gap-2 rounded-xl border border-border bg-surface p-1.5 focus-within:border-accent"
+            className="flex items-end gap-2 rounded-xl border border-border bg-surface p-1.5 shadow-sm transition-colors focus-within:border-accent"
           >
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) => {
+                setInput(event.target.value);
+                resize(event.target);
+              }}
               onKeyDown={(event) => {
-                // Enter sends; Shift+Enter adds a line, matching every other
-                // chat input people already have muscle memory for.
+                // Enter sends, Shift+Enter adds a line — the convention every
+                // other chat input has already taught people.
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  if (canSend) void send();
+                  if (canSend) void send(input.trim());
                 }
               }}
               placeholder={t.chat.placeholder}
               rows={1}
               disabled={!hasReadySource}
-              className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-fg-subtle disabled:opacity-50"
+              className="max-h-44 min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-fg-subtle disabled:opacity-50"
             />
             {streaming ? (
-              <button
+              <IconButton
                 type="button"
+                title={t.chat.stop}
+                variant="subtle"
+                size="icon"
                 onClick={() => abortRef.current?.abort()}
-                aria-label={t.chat.stop}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-fg transition-colors hover:bg-border-strong"
+                className="shrink-0 rounded-lg"
               >
-                <Square className="size-3.5 fill-current" />
-              </button>
+                <Square className="size-3 fill-current" />
+              </IconButton>
             ) : (
               <button
                 type="submit"
                 disabled={!canSend}
                 aria-label={t.chat.send}
                 className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+                  "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
                   canSend
                     ? "bg-accent text-accent-fg hover:bg-accent-hover"
                     : "bg-surface-2 text-fg-subtle",
@@ -307,7 +350,7 @@ export function ChatPanel({
           </form>
         </div>
       </div>
-    </>
+    </Panel>
   );
 }
 
@@ -323,11 +366,11 @@ function CitationList({
   if (citations.length === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-border pt-2.5">
-      <p className="mb-1.5 text-[11px] font-medium tracking-wide text-fg-subtle uppercase">
+    <div className="mt-4 rounded-lg border border-border bg-surface-2/60 p-2">
+      <p className="mb-1 px-1.5 text-[10px] font-semibold tracking-wider text-fg-subtle uppercase">
         {label}
       </p>
-      <ul className="space-y-1">
+      <ul>
         {citations.map((citation) => (
           <li key={citation.index}>
             <button
@@ -338,9 +381,9 @@ function CitationList({
                   endChar: citation.endChar,
                 })
               }
-              className="flex w-full items-baseline gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-surface-2"
+              className="flex w-full items-baseline gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface"
             >
-              <span className="shrink-0 text-[11px] font-semibold text-accent">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded bg-accent-soft text-[10px] font-bold text-accent">
                 {citation.index}
               </span>
               <span className="min-w-0 flex-1">
@@ -352,8 +395,8 @@ function CitationList({
                     </span>
                   )}
                 </span>
-                <span className="line-clamp-2 text-xs text-fg-muted italic">
-                  “{citation.quote}”
+                <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-fg-muted italic">
+                  “{citation.quote.trim()}”
                 </span>
               </span>
             </button>

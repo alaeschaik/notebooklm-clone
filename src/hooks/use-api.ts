@@ -19,11 +19,17 @@ export async function fetcher<T>(url: string): Promise<T> {
  * server-side process the user waits on, and a permanent interval would keep
  * an idle notebook talking to the server forever.
  */
-export function useSources(notebookId: string, options?: SWRConfiguration) {
+export function useSources(
+  notebookId: string,
+  initial?: Source[],
+  options?: SWRConfiguration,
+) {
   const result = useSWR<{ sources: Source[] }>(
     `/api/notebooks/${notebookId}/sources`,
     fetcher,
     {
+      // Seeded from the server render, so the panel never flashes empty first.
+      fallbackData: initial ? { sources: initial } : undefined,
       refreshInterval: (latest) =>
         latest?.sources.some(
           (source) => source.status === "pending" || source.status === "processing",
@@ -37,10 +43,11 @@ export function useSources(notebookId: string, options?: SWRConfiguration) {
   return { ...result, sources: result.data?.sources ?? [] };
 }
 
-export function useMessages(notebookId: string) {
+export function useMessages(notebookId: string, initial?: StoredMessage[]) {
   const result = useSWR<{ messages: StoredMessage[] }>(
     `/api/notebooks/${notebookId}/messages`,
     fetcher,
+    { fallbackData: initial ? { messages: initial } : undefined },
   );
   return { ...result, messages: result.data?.messages ?? [] };
 }

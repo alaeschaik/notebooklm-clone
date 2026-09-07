@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PanelLeftClose, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 
@@ -9,28 +9,36 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SourceViewer } from "@/components/sources/source-viewer";
 import { SourcesPanel } from "@/components/sources/sources-panel";
 import { StudioPanel } from "@/components/studio/studio-panel";
+import { IconButton } from "@/components/ui/button";
 import { useSources } from "@/hooks/use-api";
 import { cn } from "@/lib/cn";
-import type { HighlightTarget } from "@/lib/types";
+import { useT } from "@/lib/i18n/context";
+import type { HighlightTarget, Source, StoredMessage } from "@/lib/types";
 
 export function NotebookWorkspace({
   notebookId,
   title,
   emoji,
+  initialSources,
+  initialMessages,
 }: {
   notebookId: string;
   title: string;
   emoji: string;
+  initialSources: Source[];
+  initialMessages: StoredMessage[];
 }) {
-  const { sources, mutate } = useSources(notebookId);
+  const t = useT();
+  const { sources, mutate } = useSources(notebookId, initialSources);
   // Deselections are tracked rather than selections. A question is asked of the
   // whole notebook unless you narrow it, so "everything except what you turned
-  // off" is the real state — and it needs no effect to seed it, and leaves a
-  // source added later selected without disturbing the existing choices.
+  // off" is the real state — it needs no effect to seed it, and a source added
+  // later arrives selected without disturbing the existing choices.
   const [deselected, setDeselected] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
   const [viewing, setViewing] = useState<HighlightTarget | null>(null);
+  const [studioOpen, setStudioOpen] = useState(true);
   const chat = useRef<ChatHandle>(null);
 
   const readyIds = sources
@@ -57,36 +65,57 @@ export function NotebookWorkspace({
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+    <div className="flex h-dvh flex-col overflow-hidden bg-border">
+      <header className="flex h-13 shrink-0 items-center gap-2.5 border-b border-border bg-surface px-3">
         <Link
           href="/"
-          className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
-          aria-label="Back to notebooks"
+          aria-label={t.appName}
+          title={t.appName}
+          className="-ml-1 flex size-8 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
         >
           <ArrowLeft className="size-4" />
         </Link>
-        <span className="text-lg leading-none">{emoji}</span>
-        <h1 className="truncate font-medium">{title}</h1>
-        <div className="ml-auto flex items-center gap-2">
+        <span aria-hidden className="text-base leading-none">
+          {emoji}
+        </span>
+        <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
+
+        <div className="ml-auto flex items-center gap-1.5">
           <LocaleSwitcher />
+          <IconButton
+            title={t.studio.title}
+            onClick={() => setStudioOpen((open) => !open)}
+            className={cn("lg:hidden", studioOpen && "bg-surface-2 text-fg")}
+          >
+            <Sparkles className="size-4" />
+          </IconButton>
+          <IconButton
+            title={t.studio.title}
+            onClick={() => setStudioOpen((open) => !open)}
+            className={cn("hidden lg:inline-flex", !studioOpen && "text-fg-subtle")}
+          >
+            <PanelLeftClose
+              className={cn("size-4 transition-transform", studioOpen && "rotate-180")}
+            />
+          </IconButton>
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 gap-px bg-border lg:grid-cols-[minmax(0,var(--left))_minmax(0,1fr)_minmax(0,22rem)]"
-        style={{ "--left": viewing ? "34rem" : "19rem" } as React.CSSProperties}
-      >
-        <section
+      {/* Flex rather than grid: a width transition on a grid template column
+          does not animate, so the reader used to snap open. */}
+      <main className="flex min-h-0 flex-1 gap-px">
+        <aside
           className={cn(
-            "flex min-h-0 min-w-0 flex-col bg-surface transition-[width]",
+            "relative hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-out md:block",
+            viewing ? "w-[min(34rem,42vw)]" : "w-[19rem]",
           )}
         >
-          {viewing ? (
-            <SourceViewer
-              target={viewing}
-              onClose={() => setViewing(null)}
-            />
-          ) : (
+          <div
+            className={cn(
+              "absolute inset-0 flex flex-col transition-opacity duration-200",
+              viewing ? "pointer-events-none opacity-0" : "opacity-100",
+            )}
+          >
             <SourcesPanel
               notebookId={notebookId}
               sources={sources}
@@ -98,28 +127,47 @@ export function NotebookWorkspace({
               }
               onChanged={() => void mutate()}
             />
-          )}
-        </section>
+          </div>
 
-        <section className="flex min-h-0 min-w-0 flex-col bg-surface">
+          <div
+            className={cn(
+              "absolute inset-0 flex flex-col transition-opacity duration-200",
+              viewing ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
+            {viewing && (
+              <SourceViewer target={viewing} onClose={() => setViewing(null)} />
+            )}
+          </div>
+        </aside>
+
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
           <ChatPanel
             notebookId={notebookId}
             sources={sources}
             selectedIds={selectedIds}
             onCitationClick={openCitation}
+            initialMessages={initialMessages}
             ref={chat}
           />
         </section>
 
-        <section className="hidden min-h-0 min-w-0 flex-col bg-surface lg:flex">
-          <StudioPanel
-            notebookId={notebookId}
-            sources={sources}
-            selectedIds={selectedIds}
-            onCitationClick={openCitation}
-            onAsk={(question) => chat.current?.ask(question)}
-          />
-        </section>
+        <aside
+          className={cn(
+            "hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-out lg:block",
+            studioOpen ? "w-[21rem]" : "w-0",
+          )}
+        >
+          <div className="flex h-full w-[21rem] flex-col">
+            <StudioPanel
+              notebookId={notebookId}
+              sources={sources}
+              selectedIds={selectedIds}
+              onCitationClick={openCitation}
+              onAsk={(question) => chat.current?.ask(question)}
+            />
+          </div>
+        </aside>
       </main>
     </div>
   );

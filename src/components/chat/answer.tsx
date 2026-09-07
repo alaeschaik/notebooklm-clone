@@ -40,8 +40,9 @@ function CitationChip({
   return (
     <button
       onClick={onClick}
-      title={citation.quote}
-      className="mx-0.5 inline-flex h-[1.15em] min-w-[1.15em] translate-y-[-0.1em] items-center justify-center rounded-[0.3em] bg-accent-soft px-[0.3em] align-middle text-[0.7em] font-semibold text-accent transition-colors hover:bg-accent hover:text-accent-fg"
+      title={citation.quote.trim()}
+      aria-label={`${citation.sourceTitle}: ${citation.quote.trim()}`}
+      className="mx-[0.15em] inline-flex size-[1.35em] translate-y-[-0.08em] items-center justify-center rounded-[0.35em] bg-accent-soft align-middle text-[0.68em] font-bold text-accent tabular-nums transition-colors hover:bg-accent hover:text-accent-fg"
     >
       {citation.index}
     </button>
@@ -112,12 +113,9 @@ export function Answer({
     withChips(children, citations, onCitationClick);
 
   return (
-    <div
-      className={cn(
-        "text-[15px] leading-relaxed [&_a]:text-accent [&_a]:underline [&_code]:rounded [&_code]:bg-surface-2 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-surface-2 [&_pre]:p-3 [&_strong]:font-semibold [&_table]:my-2 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        className,
-      )}
-    >
+    // Prose rhythm lives in one place (globals.css) rather than as a long
+    // arbitrary-variant string repeated wherever an answer is rendered.
+    <div className={cn("prose-answer", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

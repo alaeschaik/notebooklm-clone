@@ -5,6 +5,8 @@ import { useState } from "react";
 import useSWR from "swr";
 
 import { Answer } from "@/components/chat/answer";
+import { StudioCard } from "@/components/studio/studio-card";
+import { IconButton } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { fetcher } from "@/hooks/use-api";
@@ -76,19 +78,14 @@ export function StudioDocs({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface-2 p-3">
-      <div className="flex items-center gap-2">
-        <FileText className="size-4 text-accent" />
-        <h3 className="text-[13px] font-semibold">{t.studio.docs}</h3>
-      </div>
-
+    <StudioCard icon={<FileText className="size-3.5" />} title={t.studio.docs}>
       <div className="mt-2.5 grid grid-cols-2 gap-1.5">
         {KINDS.map((kind) => (
           <button
             key={kind}
             onClick={() => generate(kind)}
             disabled={disabled || starting !== null}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-2 text-xs font-medium transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-2 text-xs font-medium transition-colors hover:border-accent-border hover:bg-accent-soft hover:text-accent disabled:pointer-events-none disabled:opacity-45"
           >
             {starting === kind && <Spinner className="size-3" />}
             {t.studio.kinds[kind]}
@@ -97,13 +94,13 @@ export function StudioDocs({
       </div>
 
       {docs.length > 0 && (
-        <ul className="mt-2.5 space-y-1">
+        <ul className="mt-2.5 space-y-0.5 border-t border-border pt-2">
           {docs.map((doc) => (
             <li key={doc.id} className="group flex items-center gap-1.5">
               <button
                 onClick={() => doc.status === "ready" && setOpenDoc(doc)}
                 disabled={doc.status !== "ready"}
-                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface disabled:cursor-default"
+                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2 disabled:cursor-default"
               >
                 {doc.status === "running" || doc.status === "pending" ? (
                   <Spinner className="size-3 shrink-0" />
@@ -114,13 +111,14 @@ export function StudioDocs({
                 )}
                 <span className="truncate text-xs font-medium">{doc.title}</span>
               </button>
-              <button
+              <IconButton
+                title={t.common.delete}
+                size="icon-sm"
                 onClick={() => remove(doc.id)}
-                aria-label={t.common.delete}
-                className="rounded p-1 text-fg-subtle opacity-0 transition group-hover:opacity-100 hover:bg-danger-soft hover:text-danger"
+                className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-danger-soft hover:text-danger"
               >
                 <Trash2 className="size-3" />
-              </button>
+              </IconButton>
             </li>
           ))}
         </ul>
@@ -148,6 +146,6 @@ export function StudioDocs({
           </div>
         )}
       </Dialog>
-    </section>
+    </StudioCard>
   );
 }

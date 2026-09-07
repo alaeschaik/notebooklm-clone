@@ -1,9 +1,11 @@
-import { asc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { badRequest, handleRouteError, requireOwnedNotebook } from "@/lib/api";
+import { count, eq } from "drizzle-orm";
+
 import { getDb } from "@/lib/db";
-import { sources, type sourceKind } from "@/lib/db/schema";
+import { notebooks, sources, type sourceKind } from "@/lib/db/schema";
 import { ingestSource, type IngestInput } from "@/lib/ingest/pipeline";
 import { parseVideoId } from "@/lib/ingest/youtube";
 
@@ -129,10 +131,13 @@ export async function POST(
     // here still returns 200 with a source the UI can show as failed.
     await ingestSource(created.id, input);
 
-    const [source] = await getDb()
+    const db = getDb();
+    const [source] = await db
       .select()
       .from(sources)
       .where(eq(sources.id, created.id));
+
+    await titleFromFirstSource(notebook.id, notebook.title, source?.title);
 
     return NextResponse.json(
       { source: { ...source, fullText: undefined } },
@@ -142,3 +147,40 @@ export async function POST(
     return handleRouteError(error);
   }
 }
+
+/**
+ * Names an untitled notebook after its first source.
+ *
+ * A notebook is created before there is anything to name it after, so it starts
+ * as "Untitled". Waiting for the user to rename it means most notebooks stay
+ * untitled forever and the index becomes unreadable.
+ */
+async function titleFromFirstSource(
+  notebookId: string,
+  currentTitle: string,
+  sourceTitle: string | undefined,
+): Promise<void> {
+  if (!sourceTitle) return;
+  // Only ever renames a notebook the user has not named themselves.
+  if (!UNTITLED.has(currentTitle.trim())) return;
+
+  const db = getDb();
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(sources)
+    .where(eq(sources.notebookId, notebookId));
+
+  if (Number(total) !== 1) return;
+
+  await db
+    .update(notebooks)
+    .set({ title: sourceTitle.replace(/\.(pdf|md|markdown|txt)$/i, "") })
+    .where(eq(notebooks.id, notebookId));
+}
+
+/** Titles the app itself generates, in every supported language. */
+const UNTITLED = new Set([
+  "Untitled notebook",
+  "Unbenanntes Notizbuch",
+  "",
+]);

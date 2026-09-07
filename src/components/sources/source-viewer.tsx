@@ -1,11 +1,12 @@
 "use client";
 
-import { ExternalLink, X } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
 
 import { SourceIcon } from "@/components/sources/source-icon";
-import { Spinner } from "@/components/ui/spinner";
+import { IconButton } from "@/components/ui/button";
+import { Panel, PanelBody, Skeleton } from "@/components/ui/panel";
 import { fetcher } from "@/hooks/use-api";
 import { useT } from "@/lib/i18n/context";
 import type { HighlightTarget, SourceDetail, SourceSegment } from "@/lib/types";
@@ -44,52 +45,60 @@ export function SourceViewer({
     [text, source?.pageMap],
   );
 
-  // Re-run when the range changes, not just on mount: clicking a second
-  // citation in an already-open source must move the view to the new passage.
+  // Re-runs when the range changes, not only on mount: clicking a second
+  // citation in an already-open source must move to the new passage.
   useEffect(() => {
     markRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [target.startChar, target.endChar, text]);
 
   return (
-    <>
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <button
-          onClick={onClose}
-          aria-label={t.sources.viewer.close}
-          className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
-        >
-          <X className="size-4" />
-        </button>
-        {source && (
-          <>
-            <SourceIcon kind={source.kind} className="size-3.5 shrink-0 text-fg-subtle" />
-            <h2 className="truncate text-sm font-semibold">{source.title}</h2>
-            {source.url && (
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                aria-label={t.sources.viewer.openOriginal}
-                className="ml-auto rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
-              >
-                <ExternalLink className="size-3.5" />
-              </a>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+    <Panel
+      title={
+        <span className="flex items-center gap-1.5">
+          {source && (
+            <SourceIcon
+              kind={source.kind}
+              className="size-3.5 shrink-0 text-fg-subtle"
+            />
+          )}
+          <span className="truncate">{source?.title ?? t.common.loading}</span>
+        </span>
+      }
+      actions={
+        <>
+          {source?.url && (
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              title={t.sources.viewer.openOriginal}
+              aria-label={t.sources.viewer.openOriginal}
+              className="flex size-7 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            >
+              <ExternalLink className="size-3.5" />
+            </a>
+          )}
+          <IconButton
+            title={t.sources.viewer.close}
+            size="icon-sm"
+            onClick={onClose}
+          >
+            <ArrowLeft className="size-4" />
+          </IconButton>
+        </>
+      }
+    >
+      <PanelBody className="px-5 py-4">
         {isLoading ? (
-          <div className="flex justify-center py-10">
-            <Spinner />
+          <div className="space-y-2">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className={i % 3 === 2 ? "h-4 w-2/3" : "h-4 w-full"} />
+            ))}
           </div>
         ) : (
           <div className="space-y-5">
             {blocks.map((block, index) => {
-              const blockText = text.slice(block.start, block.end);
-
-              // Clip the highlight to this block; a citation can span a page
+              // Clip the highlight to this block: a citation can span a page
               // boundary, in which case it is marked in both.
               const from = Math.max(target.startChar, block.start);
               const to = Math.min(target.endChar, block.end);
@@ -98,24 +107,27 @@ export function SourceViewer({
               return (
                 <div key={index}>
                   {block.label && (
-                    <div className="mb-1.5 text-[11px] font-medium tracking-wide text-fg-subtle uppercase">
-                      {block.label}
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="text-[10px] font-semibold tracking-wider text-fg-subtle uppercase">
+                        {block.label}
+                      </span>
+                      <span className="h-px flex-1 bg-border" />
                     </div>
                   )}
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-fg">
+                  <p className="text-[13px] leading-[1.75] whitespace-pre-wrap text-fg-muted">
                     {marked ? (
                       <>
                         {text.slice(block.start, from)}
                         <mark
                           ref={markRef}
-                          className="rounded bg-highlight px-0.5 text-fg"
+                          className="rounded-sm bg-highlight px-0.5 py-px text-fg ring-1 ring-highlight-ring"
                         >
                           {text.slice(from, to)}
                         </mark>
                         {text.slice(to, block.end)}
                       </>
                     ) : (
-                      blockText
+                      text.slice(block.start, block.end)
                     )}
                   </p>
                 </div>
@@ -123,7 +135,7 @@ export function SourceViewer({
             })}
           </div>
         )}
-      </div>
-    </>
+      </PanelBody>
+    </Panel>
   );
 }

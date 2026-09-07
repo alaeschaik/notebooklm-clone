@@ -1,9 +1,12 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
+
 import { AudioOverviewCard } from "@/components/studio/audio-overview";
 import { MindMapCard } from "@/components/studio/mind-map";
 import { NotesCard } from "@/components/studio/notes";
 import { StudioDocs } from "@/components/studio/studio-docs";
+import { Panel, PanelBody, EmptyState } from "@/components/ui/panel";
 import { useT } from "@/lib/i18n/context";
 import type { HighlightTarget, Source } from "@/lib/types";
 
@@ -25,16 +28,14 @@ export function StudioPanel({
   const disabled = !hasReadySource || selectedIds.length === 0;
 
   return (
-    <>
-      <div className="flex h-12 shrink-0 items-center border-b border-border px-3">
-        <h2 className="text-sm font-semibold">{t.studio.title}</h2>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+    <Panel title={t.studio.title}>
+      <PanelBody className="p-3">
         {!hasReadySource ? (
-          <p className="py-10 text-center text-sm text-fg-subtle">
-            {t.studio.needsSources}
-          </p>
+          <EmptyState
+            icon={<Sparkles className="size-5" />}
+            title={t.studio.title}
+            description={t.studio.needsSources}
+          />
         ) : (
           <div className="space-y-3">
             <AudioOverviewCard
@@ -60,7 +61,7 @@ export function StudioPanel({
             />
           </div>
         )}
-      </div>
-    </>
+      </PanelBody>
+    </Panel>
   );
 }

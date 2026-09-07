@@ -5,6 +5,9 @@ import { useState } from "react";
 import useSWR from "swr";
 
 import { Answer } from "@/components/chat/answer";
+import { StudioCard } from "@/components/studio/studio-card";
+import { Button, IconButton } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/field";
 import { Dialog } from "@/components/ui/dialog";
 import { fetcher } from "@/hooks/use-api";
 import { useT } from "@/lib/i18n/context";
@@ -58,28 +61,27 @@ export function NotesCard({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface-2 p-3">
-      <div className="flex items-center gap-2">
-        <NotebookPen className="size-4 text-accent" />
-        <h3 className="text-[13px] font-semibold">{t.studio.notes}</h3>
-        <button
+    <StudioCard
+      icon={<NotebookPen className="size-3.5" />}
+      title={t.studio.notes}
+      hint={notes.length === 0 ? t.studio.notesEmpty : undefined}
+      actions={
+        <IconButton
+          title={t.studio.newNote}
+          size="icon-sm"
           onClick={() => setComposing(true)}
-          aria-label={t.studio.newNote}
-          className="ml-auto rounded p-1 text-fg-subtle hover:bg-surface hover:text-fg"
         >
           <Plus className="size-3.5" />
-        </button>
-      </div>
-
-      {notes.length === 0 ? (
-        <p className="mt-2 text-xs text-fg-subtle">{t.studio.notesEmpty}</p>
-      ) : (
-        <ul className="mt-2 space-y-1">
+        </IconButton>
+      }
+    >
+      {notes.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
           {notes.map((note) => (
             <li key={note.id} className="group flex items-center gap-1.5">
               <button
                 onClick={() => setOpenNote(note)}
-                className="min-w-0 flex-1 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface"
+                className="min-w-0 flex-1 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2"
               >
                 <span className="block truncate text-xs font-medium">
                   {note.title}
@@ -88,13 +90,14 @@ export function NotesCard({
                   {note.content}
                 </span>
               </button>
-              <button
+              <IconButton
+                title={t.common.delete}
+                size="icon-sm"
                 onClick={() => remove(note.id)}
-                aria-label={t.common.delete}
-                className="rounded p-1 text-fg-subtle opacity-0 transition group-hover:opacity-100 hover:bg-danger-soft hover:text-danger"
+                className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-danger-soft hover:text-danger"
               >
                 <Trash2 className="size-3" />
-              </button>
+              </IconButton>
             </li>
           ))}
         </ul>
@@ -106,32 +109,28 @@ export function NotesCard({
         title={t.studio.newNote}
       >
         <div className="space-y-2">
-          <input
+          <Input
             value={draft.title}
             onChange={(event) => setDraft({ ...draft, title: event.target.value })}
             placeholder={t.sources.dialog.titlePlaceholder}
-            className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-accent"
           />
-          <textarea
+          <Textarea
             value={draft.content}
             onChange={(event) => setDraft({ ...draft, content: event.target.value })}
             rows={8}
-            className="w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm outline-none focus:border-accent"
           />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setComposing(false)}
-              className="rounded-lg px-3 py-1.5 text-sm text-fg-muted hover:bg-surface-2"
-            >
+          <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" onClick={() => setComposing(false)}>
               {t.common.cancel}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
               onClick={create}
               disabled={!draft.content.trim()}
-              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-50"
             >
               {t.common.save}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>
@@ -156,6 +155,6 @@ export function NotesCard({
           </div>
         )}
       </Dialog>
-    </section>
+    </StudioCard>
   );
 }
