@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Headphones, RotateCcw, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 
 import { Button } from "@/components/ui/button";
@@ -36,29 +36,71 @@ export function AudioOverviewCard({
   const { data, mutate } = useSWR<{ audio: AudioOverview | null }>(
     `/api/notebooks/${notebookId}/audio`,
     fetcher,
-    {
-      // Only poll while something is actually being generated.
-      refreshInterval: (latest) =>
-        latest?.audio?.status === "running" || latest?.audio?.status === "pending"
-          ? 2000
-          : 0,
-    },
   );
 
   const audio = data?.audio ?? null;
+  const driving = useRef(false);
+
+  /**
+   * Renders one segment per request until the overview finishes.
+   *
+   * The work is paced from here rather than run server-side in one go because
+   * free-tier speech synthesis is rate limited per minute: a full overview
+   * spends most of its time waiting, which would blow a serverless function's
+   * time limit. Driving it from the client also makes each step's progress
+   * visible instead of the user watching a spinner for five minutes.
+   */
+  const drive = useCallback(async () => {
+    if (driving.current) return;
+    driving.current = true;
+    try {
+      for (;;) {
+        const response = await fetch(
+          `/api/notebooks/${notebookId}/audio/render`,
+          { method: "POST" },
+        );
+        if (!response.ok) break;
+        const next = (await response.json()) as {
+          audio: AudioOverview | null;
+          retryAfterMs?: number;
+        };
+        await mutate({ audio: next.audio }, false);
+        if (next.audio?.status !== "running") break;
+
+        // The server asks for a pause when a segment hit a rate limit; retrying
+        // immediately would just burn the next attempt on the same quota.
+        if (next.retryAfterMs) {
+          await new Promise((resolve) => setTimeout(resolve, next.retryAfterMs));
+        }
+      }
+    } finally {
+      driving.current = false;
+    }
+  }, [notebookId, mutate]);
+
+  // Resumes a run that was interrupted by a reload.
+  useEffect(() => {
+    if (audio?.status === "running" && audio.segments?.length) void drive();
+  }, [audio?.status, audio?.segments?.length, drive]);
   const running = audio?.status === "running" || audio?.status === "pending";
   const segments = audio?.segments ?? [];
-  const done = segments.filter((segment) => segment.status !== "pending").length;
+  const done = segments.filter((segment) => segment.status === "ready").length;
+  // A segment that is retrying still has something worth telling the user.
+  const waiting = segments.find(
+    (segment) => segment.status === "pending" && (segment.attempts ?? 0) > 0,
+  );
 
   async function generate() {
     setStarting(true);
     try {
-      await fetch(`/api/notebooks/${notebookId}/audio`, {
+      const response = await fetch(`/api/notebooks/${notebookId}/audio`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sourceIds: selectedIds }),
       });
-      await mutate();
+      const next = (await response.json()) as { audio: AudioOverview | null };
+      await mutate(next, false);
+      if (next.audio?.status === "running") void drive();
     } finally {
       setStarting(false);
     }
@@ -95,6 +137,9 @@ export function AudioOverviewCard({
               ? t.studio.audioGenerating
               : t.studio.audioRendering(done, segments.length)}
           </p>
+          {waiting?.error && (
+            <p className="mt-1.5 text-xs text-warning">{waiting.error}</p>
+          )}
           {segments.length > 0 && (
             <div
               role="progressbar"

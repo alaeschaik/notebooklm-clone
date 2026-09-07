@@ -10,8 +10,16 @@ import { DEFAULT_PCM, type PcmFormat } from "./wav";
  * what makes the result sound like a conversation. Rendering each speaker
  * separately and interleaving the clips produces recognisably robotic
  * turn-taking, because neither voice hears the other's delivery.
+ *
+ * This uses `generateContent` rather than the newer Interactions API: the TTS
+ * preview models reject every audio MIME type Interactions offers, and only
+ * speak through the classic endpoint, which returns raw PCM.
  */
 export const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+
+/** Free-tier TTS is rate limited per minute, and a podcast is several calls. */
+const MAX_ATTEMPTS = 4;
+const BACKOFF_MS = 20_000;
 
 let client: GoogleGenAI | undefined;
 
@@ -19,8 +27,8 @@ function getClient(): GoogleGenAI {
   if (!client) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error(
-        "GEMINI_API_KEY is not set. It is required to render the audio overview.",
+      throw new TtsError(
+        "GEMINI_API_KEY is not set, so the audio overview cannot be rendered.",
       );
     }
     client = new GoogleGenAI({ apiKey });
@@ -29,13 +37,36 @@ function getClient(): GoogleGenAI {
 }
 
 export class TtsError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
+  /** Rate limits pass; a malformed request does not. */
+  readonly retryable: boolean;
+
+  constructor(
+    message: string,
+    options?: { cause?: unknown; retryable?: boolean },
+  ) {
     super(message, options);
     this.name = "TtsError";
+    this.retryable = options?.retryable ?? false;
   }
 }
 
 export type RenderedSegment = { pcm: Uint8Array; format: PcmFormat };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Reads the sample rate out of `audio/L16;codec=pcm;rate=24000`. */
+function parseFormat(mimeType: string | undefined): PcmFormat {
+  const rate = /rate=(\d+)/.exec(mimeType ?? "")?.[1];
+  return {
+    ...DEFAULT_PCM,
+    sampleRate: rate ? Number(rate) : DEFAULT_PCM.sampleRate,
+  };
+}
+
+function isRateLimit(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("429") || /quota|rate limit/i.test(message);
+}
 
 /** Renders one run of dialogue turns to raw PCM samples. */
 export async function renderSegment(
@@ -45,40 +76,53 @@ export async function renderSegment(
     throw new TtsError("Cannot render an empty dialogue segment.");
   }
 
-  const interaction = await getClient()
-    .interactions.create({
-      model: TTS_MODEL,
-      input: segmentPrompt(turns),
-      // Raw PCM rather than WAV: segments are concatenated as samples and get
-      // a single header at the end, so per-segment headers would be noise.
-      response_format: { type: "audio", mime_type: "audio/l16" },
-      generation_config: {
-        speech_config: HOSTS.map((host) => ({
-          speaker: host.name,
-          voice: host.voice,
-        })),
+  const request = {
+    model: TTS_MODEL,
+    contents: [{ parts: [{ text: segmentPrompt(turns) }] }],
+    config: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        multiSpeakerVoiceConfig: {
+          speakerVoiceConfigs: HOSTS.map((host) => ({
+            speaker: host.name,
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: host.voice } },
+          })),
+        },
       },
-    })
-    .catch((cause) => {
-      throw new TtsError(
-        "The speech service could not render this segment.",
-        { cause },
-      );
-    });
-
-  const audio = interaction.output_audio;
-  if (!audio?.data) {
-    throw new TtsError("The speech service returned no audio.");
-  }
-
-  return {
-    pcm: new Uint8Array(Buffer.from(audio.data, "base64")),
-    format: {
-      // Trust the response over the documented defaults: a format change would
-      // otherwise silently produce audio that plays at the wrong speed.
-      sampleRate: audio.sample_rate ?? DEFAULT_PCM.sampleRate,
-      channels: audio.channels ?? DEFAULT_PCM.channels,
-      bitsPerSample: DEFAULT_PCM.bitsPerSample,
     },
   };
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await getClient().models.generateContent(request);
+      const part = response.candidates?.[0]?.content?.parts?.[0];
+      const data = part?.inlineData?.data;
+
+      if (!data) throw new TtsError("The speech service returned no audio.");
+
+      return {
+        pcm: new Uint8Array(Buffer.from(data, "base64")),
+        // Trust the response over the documented default: a format change
+        // would otherwise silently produce audio at the wrong speed.
+        format: parseFormat(part.inlineData?.mimeType),
+      };
+    } catch (error) {
+      lastError = error;
+      // Only rate limits are worth retrying; a rejected request will be
+      // rejected again just as fast.
+      if (!isRateLimit(error) || attempt === MAX_ATTEMPTS) break;
+      await sleep(BACKOFF_MS * attempt);
+    }
+  }
+
+  const detail = lastError instanceof Error ? lastError.message : String(lastError);
+  const rateLimited = isRateLimit(lastError);
+  throw new TtsError(
+    rateLimited
+      ? "Gemini's free speech quota is temporarily exhausted — it allows only a few requests per minute."
+      : `The speech service could not render this segment: ${detail}`,
+    { cause: lastError, retryable: rateLimited },
+  );
 }

@@ -321,8 +321,12 @@ export type AudioSegment = {
   turnStart: number;
   turnEnd: number;
   status: "pending" | "ready" | "failed";
+  /** Where the rendered PCM is parked until every segment is done. */
   blobUrl?: string;
   byteLength?: number;
+  sampleRate?: number;
+  /** Render attempts so far, so a retryable failure gives up eventually. */
+  attempts?: number;
   error?: string;
 };
 

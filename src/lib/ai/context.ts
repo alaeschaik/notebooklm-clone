@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db";
 import { sources, type SourceSegment } from "@/lib/db/schema";
 
 import type { DocumentRef } from "./citations";
-import { embedOne } from "./embeddings";
+import { embedQuery } from "./embeddings";
 import { retrieveChunks } from "./retrieval";
 
 /**
@@ -155,7 +155,7 @@ export async function buildContext({
   const chunks = await retrieveChunks({
     notebookId,
     sourceIds: loaded.map((s) => s.id),
-    queryEmbedding: await embedOne(question),
+    queryEmbedding: await embedQuery(question),
     queryText: question,
   });
 
