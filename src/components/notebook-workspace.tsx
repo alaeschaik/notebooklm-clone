@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { ChatPanel, type ChatHandle } from "@/components/chat/chat-panel";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { ShareButton } from "@/components/share-button";
 import { SourceViewer } from "@/components/sources/source-viewer";
 import { SourcesPanel } from "@/components/sources/sources-panel";
 import { StudioPanel } from "@/components/studio/studio-panel";
@@ -19,12 +20,14 @@ export function NotebookWorkspace({
   notebookId,
   title,
   emoji,
+  publicSlug,
   initialSources,
   initialMessages,
 }: {
   notebookId: string;
   title: string;
   emoji: string;
+  publicSlug: string | null;
   initialSources: Source[];
   initialMessages: StoredMessage[];
 }) {
@@ -81,6 +84,7 @@ export function NotebookWorkspace({
         <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <ShareButton notebookId={notebookId} initialSlug={publicSlug} />
           <LocaleSwitcher />
           <IconButton
             title={t.studio.title}

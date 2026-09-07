@@ -26,13 +26,17 @@ function toBlocks(text: string, segments: SourceSegment[] | null): Block[] {
 export function SourceViewer({
   target,
   onClose,
+  /** Overridden by shared notebooks, which are read through the share slug
+   * rather than the owner-scoped source route. */
+  resolveUrl = (sourceId) => `/api/sources/${sourceId}`,
 }: {
   target: HighlightTarget;
   onClose: () => void;
+  resolveUrl?: (sourceId: string) => string;
 }) {
   const t = useT();
   const { data, isLoading } = useSWR<{ source: SourceDetail }>(
-    `/api/sources/${target.sourceId}`,
+    resolveUrl(target.sourceId),
     fetcher,
   );
   const markRef = useRef<HTMLElement>(null);

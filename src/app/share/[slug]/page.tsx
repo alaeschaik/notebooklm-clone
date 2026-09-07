@@ -1,32 +1,27 @@
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
-import { NotebookWorkspace } from "@/components/notebook-workspace";
+import { SharedNotebook } from "@/components/shared-notebook";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, sources } from "@/lib/db/schema";
-import { getVisitorId } from "@/lib/session-server";
 import type { Source, StoredMessage } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function NotebookPage(
-  props: PageProps<"/notebook/[id]">,
-) {
-  const { id } = await props.params;
-  const visitorId = await getVisitorId();
-  if (!visitorId) notFound();
+/** Shared notebooks are unlisted, not indexed. */
+export const metadata = { robots: { index: false, follow: false } };
 
+export default async function SharedPage(props: PageProps<"/share/[slug]">) {
+  const { slug } = await props.params;
   const db = getDb();
+
   const [notebook] = await db
     .select()
     .from(notebooks)
-    .where(and(eq(notebooks.id, id), eq(notebooks.ownerId, visitorId)));
+    .where(eq(notebooks.publicSlug, slug));
 
   if (!notebook) notFound();
 
-  // Fetched here rather than left to the client so the first paint already has
-  // the notebook's contents. Loading them client-side means every visit flashes
-  // an empty state before the real one arrives.
   const [sourceRows, messageRows] = await Promise.all([
     db
       .select({
@@ -50,12 +45,12 @@ export default async function NotebookPage(
       .orderBy(asc(messages.createdAt)),
   ]);
 
-  const initialSources: Source[] = sourceRows.map((row) => ({
+  const notebookSources: Source[] = sourceRows.map((row) => ({
     ...row,
     createdAt: row.createdAt.toISOString(),
   }));
 
-  const initialMessages: StoredMessage[] = messageRows.map((row) => ({
+  const conversation: StoredMessage[] = messageRows.map((row) => ({
     id: row.id,
     role: row.role,
     content: row.content,
@@ -65,13 +60,12 @@ export default async function NotebookPage(
   }));
 
   return (
-    <NotebookWorkspace
-      notebookId={notebook.id}
+    <SharedNotebook
+      slug={slug}
       title={notebook.title}
       emoji={notebook.emoji}
-      publicSlug={notebook.publicSlug}
-      initialSources={initialSources}
-      initialMessages={initialMessages}
+      sources={notebookSources}
+      messages={conversation}
     />
   );
 }
