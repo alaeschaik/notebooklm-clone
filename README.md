@@ -74,6 +74,7 @@ a 44-byte header inside the audio, which decodes as noise.
 | Claude Opus 5 | grounded chat, studio documents, mind maps, audio scripts |
 | Gemini | embeddings (`gemini-embedding-001`) and multi-speaker TTS |
 | Tailwind v4 | token-based design system, light and dark |
+| Docker Compose | two containers, self-hosted, no managed services |
 
 Two provider decisions worth noting. Citations and structured outputs are
 mutually exclusive in the API, which partitions the work cleanly: prose output
@@ -86,20 +87,28 @@ embedding endpoint is on the free tier.
 
 ## Running it
 
+The whole thing is two containers:
+
 ```bash
-cp .env.example .env.local     # add ANTHROPIC_API_KEY and GEMINI_API_KEY
-docker compose up -d           # Postgres with pgvector on :5433
-npm install
-npm run db:migrate
-npm run dev
+cp .env.example .env           # add ANTHROPIC_API_KEY, GEMINI_API_KEY, SESSION_SECRET
+docker compose up -d --build
 ```
 
-No Neon account is needed locally. The driver is chosen from `DATABASE_URL`:
-Neon's HTTP driver for `*.neon.tech` (right for serverless — a pooled TCP
-connection would cost more than it saves), node-postgres otherwise.
+That is the complete setup — <http://localhost:3000>. The app applies its own
+database migrations on boot, so there is no separate migration step and no
+managed service to sign up for. See [DEPLOY.md](DEPLOY.md) for backups,
+upgrades and running behind a reverse proxy.
+
+For development against the source:
+
+```bash
+docker compose up -d postgres  # just the database
+npm install && npm run db:migrate && npm run dev
+```
 
 ```bash
 npm test        # unit tests
+npm run e2e     # browser tests (needs a running app)
 npm run lint
 npm run typecheck
 ```
@@ -118,6 +127,12 @@ The pure, breakable logic — not the API calls:
   is the classic cause of audio that plays truncated or not at all.
 - **Script segmentation** never splits a speaker turn.
 - **Session cookies** reject a swapped visitor id carrying a valid signature.
+- **Marker weaving** keeps every citation marker at its own offset — inserting
+  front-to-back would shift each later one by the width of those already placed.
+
+Browser tests (Playwright) cover what unit tests structurally cannot: a
+server-rendering crash, a hydration mismatch, and layout that fails to fill the
+viewport. Each of those shipped here at least once, and each now has a test.
 
 ---
 
@@ -138,3 +153,6 @@ Stated plainly, because they are real:
 - **Anonymous sessions.** A notebook belongs to a browser cookie. Clearing
   cookies loses access — deliberate, so a reviewer can open the app and start
   working with no signup.
+- **Single instance assumed.** Migrations run on boot, which is right for one
+  container and wrong for several starting at once. `RUN_MIGRATIONS_ON_BOOT=false`
+  exists for that case.
