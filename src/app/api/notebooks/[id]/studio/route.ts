@@ -11,8 +11,6 @@ import { getDb } from "@/lib/db";
 import { studioDocs, studioKind, type CitationMarker } from "@/lib/db/schema";
 import type { Locale } from "@/lib/i18n/dictionaries";
 
-export const maxDuration = 300;
-
 type Kind = (typeof studioKind.enumValues)[number];
 
 export async function GET(

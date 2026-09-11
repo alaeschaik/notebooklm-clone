@@ -10,7 +10,6 @@ import { ingestSource, type IngestInput } from "@/lib/ingest/pipeline";
 import { parseVideoId } from "@/lib/ingest/youtube";
 
 /** Ingestion parses, chunks and embeds in one request; give it room. */
-export const maxDuration = 300;
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 

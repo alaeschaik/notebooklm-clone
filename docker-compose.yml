@@ -1,23 +1,56 @@
-# Local Postgres with pgvector, so the project runs end to end without a Neon
-# account. Production uses Neon; src/lib/db picks the driver from the URL.
+# Self-hosted stack: the app and its database, nothing else required.
+#
+#   cp .env.example .env   # add ANTHROPIC_API_KEY and GEMINI_API_KEY
+#   docker compose up -d --build
+#
+# The app applies database migrations itself on boot, so there is no separate
+# migration step to remember.
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: notebooklm-pg
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: notebook
-      POSTGRES_PASSWORD: notebook
-      POSTGRES_DB: notebook
-    ports:
-      # 5433 to avoid colliding with a Postgres already running on 5432.
-      - "5433:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-notebook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notebook}
+      POSTGRES_DB: ${POSTGRES_DB:-notebook}
     volumes:
-      - notebooklm-pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Published on 5433 so it cannot collide with a Postgres already running
+      # on the host. Drop this block entirely if nothing outside the compose
+      # network needs to reach the database.
+      - "${POSTGRES_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notebook -d notebook"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notebook} -d ${POSTGRES_DB:-notebook}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 12
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        # Waiting for healthy, not merely started: the app migrates on boot and
+        # would otherwise race an unready database on a cold start.
+        condition: service_healthy
+    environment:
+      # Reaches Postgres over the compose network, so the published host port
+      # is irrelevant here.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-notebook}:${POSTGRES_PASSWORD:-notebook}@postgres:5432/${POSTGRES_DB:-notebook}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      STORAGE_DIR: /data/blobs
+    volumes:
+      # Generated audio lives here, so it survives a rebuild.
+      - blobs:/data
+    ports:
+      - "${APP_PORT:-3000}:3000"
 
 volumes:
-  notebooklm-pgdata:
+  pgdata:
+  blobs:

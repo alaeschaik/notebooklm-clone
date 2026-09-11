@@ -5,79 +5,51 @@ import path from "node:path";
  * Rendered audio needs somewhere to live that is not the database — a few
  * minutes of PCM-derived WAV is megabytes, which is the wrong shape for a row.
  *
- * On Vercel that is Blob storage. Locally there is no Blob token, so files go
- * to a gitignored directory and are served back by an API route. Same contract
- * either way: put bytes, get a URL.
+ * Files go to a directory on disk, which in the container is a mounted volume
+ * so audio survives a rebuild. Everything is addressed by key; callers never
+ * construct paths themselves.
  */
-const LOCAL_DIR = path.join(process.cwd(), ".data", "blobs");
+const ROOT = path.resolve(process.env.STORAGE_DIR ?? path.join(process.cwd(), ".data", "blobs"));
 
-export function usingVercelBlob(): boolean {
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  // .env.example ships a placeholder; treating it as real produces a
-  // "this store does not exist" failure at the very end of a long job.
-  return Boolean(token) && !token!.endsWith("...");
+/**
+ * Resolves a key to a path inside the storage root, refusing anything that
+ * escapes it. Keys embed ids the caller supplies, so this is the one place
+ * that has to be certain about traversal.
+ */
+function resolveKey(key: string): string | null {
+  const target = path.resolve(ROOT, key);
+  return target === ROOT || target.startsWith(ROOT + path.sep) ? target : null;
 }
 
-export async function putFile(
-  key: string,
-  data: Uint8Array,
-  contentType: string,
-): Promise<string> {
-  if (usingVercelBlob()) {
-    const { put } = await import("@vercel/blob");
-    const blob = await put(key, Buffer.from(data), {
-      access: "public",
-      contentType,
-      // Keys already contain a generated id, so the random suffix would only
-      // make the URL harder to reason about.
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
-    return blob.url;
-  }
+/** Strips the serving prefix back off a URL produced by {@link putFile}. */
+function keyFromUrl(url: string): string {
+  return url.replace(/^\/api\/files\//, "");
+}
 
-  const target = path.join(LOCAL_DIR, key);
+export async function putFile(key: string, data: Uint8Array): Promise<string> {
+  const target = resolveKey(key);
+  if (!target) throw new Error(`Refusing to write outside the storage root: ${key}`);
+
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, data);
   return `/api/files/${key}`;
 }
 
-/**
- * Reads back something written by {@link putFile}, given the URL it returned.
- * Intermediate audio segments are written and re-read across separate
- * requests, so this has to work for both backends.
- */
+/** Reads back a file by the URL {@link putFile} returned. */
 export async function getFile(url: string): Promise<Uint8Array | null> {
-  if (/^https?:\/\//.test(url)) {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    return new Uint8Array(await response.arrayBuffer());
-  }
-
-  const key = url.replace(/^\/api\/files\//, "");
-  const file = await readLocalFile(key);
+  const file = await readStoredFile(keyFromUrl(url));
   return file ? new Uint8Array(file) : null;
 }
 
-/** Deletes an intermediate file once it has been folded into the final audio. */
+/** Deletes an intermediate file once it has been folded into a final one. */
 export async function deleteFile(url: string): Promise<void> {
-  if (/^https?:\/\//.test(url)) {
-    const { del } = await import("@vercel/blob");
-    await del(url).catch(() => {});
-    return;
-  }
-  const key = url.replace(/^\/api\/files\//, "");
-  const target = path.resolve(LOCAL_DIR, key);
-  if (target.startsWith(path.resolve(LOCAL_DIR) + path.sep)) {
-    await rm(target).catch(() => {});
-  }
+  const target = resolveKey(keyFromUrl(url));
+  if (target) await rm(target).catch(() => {});
 }
 
-/** Reads a locally stored file. Only used by the development file route. */
-export async function readLocalFile(key: string): Promise<Buffer | null> {
-  // Contain the path: a traversing key must not escape the storage directory.
-  const target = path.resolve(LOCAL_DIR, key);
-  if (!target.startsWith(path.resolve(LOCAL_DIR) + path.sep)) return null;
-
+/** Reads a stored file by key. Used by the route that serves them. */
+export async function readStoredFile(key: string): Promise<Buffer | null> {
+  const target = resolveKey(key);
+  if (!target) return null;
   return readFile(target).catch(() => null);
 }

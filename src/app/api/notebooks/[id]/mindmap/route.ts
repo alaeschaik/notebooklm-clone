@@ -9,8 +9,6 @@ import { getDb } from "@/lib/db";
 import { mindMaps, type MindMapNode } from "@/lib/db/schema";
 import type { Locale } from "@/lib/i18n/dictionaries";
 
-export const maxDuration = 300;
-
 /**
  * Three levels, declared explicitly rather than recursively: JSON Schema
  * recursion via $ref is supported unevenly, and a hand-rolled depth limit also

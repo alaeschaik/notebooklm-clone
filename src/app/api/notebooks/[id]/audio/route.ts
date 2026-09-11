@@ -9,8 +9,6 @@ import { getDb } from "@/lib/db";
 import { audioOverviews, type DialogueTurn } from "@/lib/db/schema";
 import { getLocale } from "@/lib/i18n/server";
 
-export const maxDuration = 300;
-
 const SCRIPT_SCHEMA = {
   type: "object",
   properties: {

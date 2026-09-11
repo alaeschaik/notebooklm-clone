@@ -1,6 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
-import { drizzle as drizzlePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import * as schema from "./schema";
 
@@ -8,50 +7,39 @@ function connectionString(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env.local and add a Postgres connection string.",
+      "DATABASE_URL is not set. Copy .env.example to .env and point it at your Postgres instance.",
     );
   }
   return url;
 }
 
-/** Neon's HTTP driver only speaks to Neon endpoints. */
-function isNeon(url: string): boolean {
-  return /\.neon\.tech|neon\.build/.test(url);
-}
-
 /**
- * Two drivers, chosen by connection string.
+ * A pooled connection, because this runs as a long-lived server rather than as
+ * per-request functions: the cost of establishing a connection is paid once and
+ * amortised over every request that follows.
  *
- * In production the database is Neon, and its HTTP driver suits the workload:
- * each request is a short burst of queries from a serverless function, where
- * establishing a pooled TCP connection would cost more than it saves.
- *
- * That driver cannot talk to an ordinary Postgres, so local development falls
- * back to node-postgres. This is what lets the project run against a Docker
- * Postgres with no Neon account at all.
- *
- * Created lazily, so importing this module — which Next does while collecting
- * page data at build time — never requires a reachable database.
+ * Created lazily so that importing this module — which Next does while
+ * collecting page data during the build — never requires a reachable database.
  */
 let cached: Database | undefined;
+let pool: Pool | undefined;
 
-function create(): Database {
-  const url = connectionString();
-  const options = { schema, casing: "snake_case" } as const;
-
-  if (!isNeon(url)) return drizzlePg(url, options);
-
-  // Both drivers expose the same Drizzle query builder, and `execute` returns
-  // `.rows` on each. Declaring one concrete type keeps the builder's overloads
-  // usable — a union of the two collapses them and breaks `.returning()`.
-  return drizzleNeon(neon(url), options) as unknown as Database;
+export function getPool(): Pool {
+  pool ??= new Pool({
+    connectionString: connectionString(),
+    // Comfortably under Postgres' default max_connections of 100, leaving room
+    // for migrations and a psql session without exhausting the server.
+    max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
+  return pool;
 }
 
 export function getDb(): Database {
-  cached ??= create();
+  cached ??= drizzle(getPool(), { schema, casing: "snake_case" });
   return cached;
 }
 
 export type Database = NodePgDatabase<typeof schema>;
-
 export { schema };

@@ -5,8 +5,6 @@ import { languageInstruction } from "@/lib/ai/prompts";
 import { generateStructured, loadSourceText } from "@/lib/ai/structured";
 import { getLocale } from "@/lib/i18n/server";
 
-export const maxDuration = 60;
-
 const SCHEMA = {
   type: "object",
   properties: {

@@ -1,0 +1,21 @@
+# Anything reproducible from source, or specific to a developer's machine.
+node_modules
+.next
+.git
+.github
+.data
+.idea
+.vscode
+test-results
+playwright-report
+e2e
+*.test.ts
+.env
+.env.*
+!.env.example
+README.md
+DEPLOY.md
+AGENTS.md
+CLAUDE.md
+Dockerfile
+.dockerignore

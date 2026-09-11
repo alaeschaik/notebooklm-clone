@@ -8,8 +8,6 @@ import { getDb } from "@/lib/db";
 import { audioOverviews, type AudioSegment } from "@/lib/db/schema";
 import { deleteFile, getFile, putFile } from "@/lib/storage";
 
-export const maxDuration = 300;
-
 /**
  * How many times a segment may be re-attempted before it is given up on.
  * Rate limiting is the common failure here and it clears on its own, so a
@@ -56,7 +54,6 @@ export async function POST(
         next.blobUrl = await putFile(
           `notebooks/${notebook.id}/audio-${job.id}-${next.idx}.pcm`,
           pcm,
-          "application/octet-stream",
         );
         next.byteLength = pcm.byteLength;
         next.sampleRate = format.sampleRate;
@@ -116,7 +113,6 @@ export async function POST(
     const audioUrl = await putFile(
       `notebooks/${notebook.id}/audio-${job.id}.wav`,
       pcmToWav(pcm, format),
-      "audio/wav",
     );
 
     // The per-segment PCM has served its purpose and is far larger than the
