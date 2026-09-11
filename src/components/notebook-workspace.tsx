@@ -70,7 +70,11 @@ export function NotebookWorkspace({
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-border">
+    // `fixed inset-0` rather than a viewport height unit: this is a
+    // full-viewport app shell, and anchoring it to the viewport directly means
+    // the columns fill it without depending on an unbroken html/body height
+    // chain above them.
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-border">
       <header className="flex h-13 shrink-0 items-center gap-2.5 border-b border-border bg-surface px-3">
         <Link
           href="/"

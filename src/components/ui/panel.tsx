@@ -18,8 +18,11 @@ export function Panel({
   children: ReactNode;
   className?: string;
 }) {
+  // h-full matters: a Panel is the root of a column, and as a flex item with
+  // the default flex-grow of 0 it would otherwise stop at its content height,
+  // leaving the column's background ending partway down the screen.
   return (
-    <div className={cn("flex min-h-0 min-w-0 flex-col bg-surface", className)}>
+    <div className={cn("flex h-full min-h-0 min-w-0 flex-col bg-surface", className)}>
       {title !== undefined && (
         <header className="flex h-13 shrink-0 items-center gap-2 border-b border-border px-3">
           <h2 className="truncate text-[13px] font-semibold tracking-tight">

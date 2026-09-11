@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowUp, BookmarkPlus, Check, MessagesSquare, Square, Trash2 } from "lucide-react";
+import {
+  ArrowUp,
+  BookmarkPlus,
+  Check,
+  MessagesSquare,
+  Square,
+  Trash2,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -74,14 +81,19 @@ export function ChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasReadySource = sources.some((source) => source.status === "ready");
-  const canSend = input.trim().length > 0 && selectedIds.length > 0 && !streaming;
+  const canSend =
+    input.trim().length > 0 && selectedIds.length > 0 && !streaming;
 
-  useImperativeHandle(ref, () => ({
-    ask: (question: string) => {
-      setInput(question);
-      inputRef.current?.focus();
-    },
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      ask: (question: string) => {
+        setInput(question);
+        inputRef.current?.focus();
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -205,9 +217,12 @@ export function ChatPanel({
       }
     >
       <PanelBody className="px-4 py-6">
-        <div className="mx-auto max-w-[46rem] space-y-7">
-          {messages.length === 0 && !streaming && (
-            <>
+        {messages.length === 0 && !streaming ? (
+          // Centred rather than pinned to the top: the panel is full height, so
+          // an empty conversation would otherwise leave the prompt stranded
+          // against the header above a screen of nothing.
+          <div className="flex h-full items-center justify-center">
+            <div className="w-full max-w-[34rem]">
               <EmptyState
                 icon={<MessagesSquare className="size-5" />}
                 title={hasReadySource ? t.chat.empty : t.chat.emptyNoSources}
@@ -219,80 +234,87 @@ export function ChatPanel({
                   onPick={(question) => void send(question)}
                 />
               )}
-            </>
-          )}
-
-          {messages.map((message) =>
-            message.role === "user" ? (
-              <div key={message.id} className="flex justify-end">
-                <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-relaxed text-fg">
-                  {message.content}
-                </p>
-              </div>
-            ) : (
-              <div key={message.id} className="group animate-fade-in">
-                <Answer
-                  content={message.content}
-                  citations={message.citations ?? []}
-                  markers={message.markers ?? []}
-                  onCitationClick={onCitationClick}
-                />
-                <CitationList
-                  citations={message.citations ?? []}
-                  label={t.chat.citationsLabel}
-                  onCitationClick={onCitationClick}
-                />
-                <SaveToNotes notebookId={notebookId} message={message} />
-              </div>
-            ),
-          )}
-
-          {streaming && (
-            <>
-              <div className="flex justify-end">
-                <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-relaxed text-fg">
-                  {streaming.question}
-                </p>
-              </div>
-              <div className="animate-fade-in">
-                {streaming.mode && (
-                  <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-fg-subtle">
-                    {streaming.mode === "full"
-                      ? t.chat.contextFull
-                      : t.chat.contextRetrieval(streaming.documents)}
+            </div>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-[46rem] space-y-7">
+            {messages.map((message) =>
+              message.role === "user" ? (
+                <div key={message.id} className="flex justify-end">
+                  <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-relaxed text-fg">
+                    {message.content}
                   </p>
-                )}
-                {streaming.text ? (
+                </div>
+              ) : (
+                <div key={message.id} className="group animate-fade-in">
                   <Answer
-                    content={streaming.text}
-                    citations={streaming.citations}
-                    markers={streaming.markers}
+                    content={message.content}
+                    citations={message.citations ?? []}
+                    markers={message.markers ?? []}
                     onCitationClick={onCitationClick}
                   />
-                ) : (
-                  <p className="flex items-center gap-2 text-sm text-fg-subtle">
-                    <Spinner className="size-3.5" />
-                    {t.chat.thinking}
+                  <CitationList
+                    citations={message.citations ?? []}
+                    label={t.chat.citationsLabel}
+                    onCitationClick={onCitationClick}
+                  />
+                  <SaveToNotes notebookId={notebookId} message={message} />
+                </div>
+              ),
+            )}
+
+            {streaming && (
+              <>
+                <div className="flex justify-end">
+                  <p className="max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-relaxed text-fg">
+                    {streaming.question}
                   </p>
-                )}
-              </div>
-            </>
-          )}
+                </div>
+                <div className="animate-fade-in">
+                  {streaming.mode && (
+                    <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-fg-subtle">
+                      {streaming.mode === "full"
+                        ? t.chat.contextFull
+                        : t.chat.contextRetrieval(streaming.documents)}
+                    </p>
+                  )}
+                  {streaming.text ? (
+                    <Answer
+                      content={streaming.text}
+                      citations={streaming.citations}
+                      markers={streaming.markers}
+                      onCitationClick={onCitationClick}
+                    />
+                  ) : (
+                    <p className="flex items-center gap-2 text-sm text-fg-subtle">
+                      <Spinner className="size-3.5" />
+                      {t.chat.thinking}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
-          {error && (
-            <p className="rounded-lg border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger">
-              {error}
-            </p>
-          )}
+            <div ref={bottomRef} />
+          </div>
+        )}
 
-          <div ref={bottomRef} />
-        </div>
+        {/* Outside the branch above: a request rejected before anything is
+            stored leaves the conversation empty, and the error would be hidden
+            behind the empty state exactly when it matters most. */}
+        {error && (
+          <p className="mx-auto mt-4 max-w-[46rem] rounded-lg border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger">
+            {error}
+          </p>
+        )}
       </PanelBody>
 
       <div className="shrink-0 border-t border-border bg-surface px-4 py-3">
         <div className="mx-auto max-w-[46rem]">
           {selectedIds.length === 0 && hasReadySource && (
-            <p className="mb-2 text-xs text-warning">{t.chat.noSourcesSelected}</p>
+            <p className="mb-2 text-xs text-warning">
+              {t.chat.noSourcesSelected}
+            </p>
           )}
           <form
             onSubmit={(event) => {
