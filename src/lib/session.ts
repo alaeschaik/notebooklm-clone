@@ -3,7 +3,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 export const SESSION_COOKIE = "nb_sid";
 
 /** A year — notebooks are anonymous, so losing the cookie loses the work. */
-export const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
+const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
 
 function secret(): string {
   const value = process.env.SESSION_SECRET;

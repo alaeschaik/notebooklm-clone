@@ -10,7 +10,7 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-export async function fetchPage(
+async function fetchPage(
   url: string,
 ): Promise<{ body: ArrayBuffer; contentType: string; finalUrl: string }> {
   let parsed: URL;

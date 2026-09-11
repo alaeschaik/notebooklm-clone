@@ -82,9 +82,3 @@ export function segmentPrompt(turns: DialogueTurn[]): string {
 
   return `TTS the following conversation between ${HOSTS[0].name} and ${HOSTS[1].name}:\n${lines}`;
 }
-
-export function scriptDurationEstimateMs(turns: DialogueTurn[]): number {
-  const characters = turns.reduce((sum, turn) => sum + turn.text.length, 0);
-  // Conversational speech runs at roughly 15 characters per second.
-  return Math.round((characters / 15) * 1000);
-}

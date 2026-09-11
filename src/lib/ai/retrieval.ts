@@ -18,7 +18,7 @@ const RRF_K = 60;
 /** How deep each retrieval arm searches before the two are fused. */
 const ARM_DEPTH = 40;
 
-export function toVectorLiteral(embedding: number[]): string {
+function toVectorLiteral(embedding: number[]): string {
   return `[${embedding.join(",")}]`;
 }
 

@@ -28,7 +28,7 @@ export type DocumentRef = {
  */
 export type DocumentCitation = Extract<TextCitation, { document_index: number }>;
 
-export function isDocumentCitation(
+function isDocumentCitation(
   citation: TextCitation,
 ): citation is DocumentCitation {
   return "document_index" in citation;

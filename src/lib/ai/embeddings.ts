@@ -31,7 +31,7 @@ let client: GoogleGenAI | undefined;
  * alone — and notebooks small enough to be sent in full never consult the index
  * at all. Failing hard would make an optional provider a hard dependency.
  */
-export function embeddingsEnabled(): boolean {
+function embeddingsEnabled(): boolean {
   const key = process.env.GEMINI_API_KEY?.trim();
   // The template in .env.example ships a placeholder; treat it as absent so a
   // half-configured checkout degrades instead of erroring on every ingest.

@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -253,32 +253,6 @@ export const mindMaps = pgTable(
   },
   (t) => [index("mind_maps_notebook_idx").on(t.notebookId, t.createdAt)],
 );
-
-// --- Relations -------------------------------------------------------------
-
-export const notebooksRelations = relations(notebooks, ({ many }) => ({
-  sources: many(sources),
-  messages: many(messages),
-  notes: many(notes),
-  studioDocs: many(studioDocs),
-  audioOverviews: many(audioOverviews),
-  mindMaps: many(mindMaps),
-}));
-
-export const sourcesRelations = relations(sources, ({ one, many }) => ({
-  notebook: one(notebooks, {
-    fields: [sources.notebookId],
-    references: [notebooks.id],
-  }),
-  chunks: many(chunks),
-}));
-
-export const chunksRelations = relations(chunks, ({ one }) => ({
-  source: one(sources, {
-    fields: [chunks.sourceId],
-    references: [sources.id],
-  }),
-}));
 
 // --- JSON column shapes ----------------------------------------------------
 
