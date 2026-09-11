@@ -8,8 +8,6 @@ import { CHAT_SYSTEM } from "@/lib/ai/prompts";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, type CitationMarker, type StoredCitation } from "@/lib/db/schema";
 
-export const maxDuration = 300;
-
 /** Recent turns kept so follow-ups like "and the second one?" resolve. */
 const HISTORY_TURNS = 10;
 
@@ -113,7 +111,25 @@ export async function POST(
             ],
           });
 
+          // Citations for the block currently being streamed. They cannot be
+          // positioned as they arrive: Claude emits a block's citations before
+          // its text, so using the running length would put every marker in
+          // front of the sentence it supports instead of after it.
+          let pending: StoredCitation[] = [];
+
+          const flushCitations = () => {
+            for (const citation of pending) {
+              markers.push({ position: answer.length, index: citation.index });
+              send({ type: "citation", position: answer.length, citation });
+            }
+            pending = [];
+          };
+
           for await (const event of claude) {
+            if (event.type === "content_block_stop") {
+              flushCitations();
+              continue;
+            }
             if (event.type !== "content_block_delta") continue;
 
             if (event.delta.type === "text_delta") {
@@ -121,13 +137,12 @@ export async function POST(
               send({ type: "text", text: event.delta.text });
             } else if (event.delta.type === "citations_delta") {
               const citation = resolver.add(event.delta.citation);
-              if (!citation) continue;
-              // The marker belongs at the current end of the text: Claude
-              // emits a citation right after the text block it supports.
-              markers.push({ position: answer.length, index: citation.index });
-              send({ type: "citation", position: answer.length, citation });
+              if (citation) pending.push(citation);
             }
           }
+
+          // A final block that never reported a stop must not lose its markers.
+          flushCitations();
 
           const [saved] = await db
             .insert(messages)

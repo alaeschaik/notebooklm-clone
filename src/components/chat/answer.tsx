@@ -4,29 +4,9 @@ import { Children, isValidElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { MARKER_PATTERN, weaveMarkers } from "@/lib/citation-markers";
 import { cn } from "@/lib/cn";
 import type { CitationMarker, HighlightTarget, StoredCitation } from "@/lib/types";
-
-/**
- * Markers are woven into the text as sentinels before Markdown parsing, then
- * swapped for chips during rendering.
- *
- * Rendering Markdown first and inserting chips afterwards is not possible:
- * parsing discards the character offsets the markers are expressed in, and
- * source positions no longer correspond to anything in the output tree.
- */
-const SENTINEL = /⁢(\d+)⁢/g;
-
-export function weaveMarkers(text: string, markers: CitationMarker[]): string {
-  // Applied back to front so each insertion leaves earlier offsets intact.
-  return [...markers]
-    .sort((a, b) => b.position - a.position)
-    .reduce(
-      (acc, marker) =>
-        `${acc.slice(0, marker.position)}⁢${marker.index}⁢${acc.slice(marker.position)}`,
-      text,
-    );
-}
 
 function CitationChip({
   citation,
@@ -57,7 +37,7 @@ function withChips(
 ): ReactNode {
   return Children.map(children, (child) => {
     if (typeof child === "string") {
-      const parts = child.split(SENTINEL);
+      const parts = child.split(new RegExp(MARKER_PATTERN.source));
       if (parts.length === 1) return child;
 
       // split() with one capture group alternates: text, capture, text, …
