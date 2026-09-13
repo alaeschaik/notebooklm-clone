@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { ChatPanel, type ChatHandle } from "@/components/chat/chat-panel";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { NotebookTitle } from "@/components/notebook-title";
 import { ShareButton } from "@/components/share-button";
 import { SourceViewer } from "@/components/sources/source-viewer";
 import { SourcesPanel } from "@/components/sources/sources-panel";
@@ -87,7 +88,7 @@ export function NotebookWorkspace({
         <span aria-hidden className="text-base leading-none">
           {emoji}
         </span>
-        <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
+        <NotebookTitle notebookId={notebookId} initialTitle={title} />
 
         <div className="ml-auto flex items-center gap-1.5">
           <ShareButton

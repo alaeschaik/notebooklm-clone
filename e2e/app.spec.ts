@@ -56,6 +56,59 @@ test.describe("application shell", () => {
     expect(problems.filter((p) => !/favicon|404 \(Not Found\)/i.test(p))).toEqual([]);
   });
 
+  test("renames a notebook and keeps the new name", async ({ page }) => {
+    const id = await seedNotebook(page);
+    await page.goto(`/notebook/${id}`);
+
+    // The title starts as the first source's name, which is a guess and often
+    // the wrong one.
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toContainText("Kestrel Dam Report");
+    await heading.getByRole("button").click();
+
+    const field = page.getByRole("textbox", { name: /notebook title/i });
+    await field.fill("Dam safety review");
+
+    // The heading updates optimistically, so asserting on it says nothing
+    // about whether the write landed. Wait for the request itself before
+    // reloading, or the reload races it.
+    const [saved] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/notebooks/${id}`) &&
+          response.request().method() === "PATCH",
+      ),
+      field.press("Enter"),
+    ]);
+    expect(saved.ok()).toBe(true);
+
+    await expect(heading).toContainText("Dam safety review");
+
+    // Persisted, not just held in component state.
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "Dam safety review",
+    );
+
+    // And reflected on the index, which reads its own copy.
+    await page.goto("/");
+    await expect(page.getByText("Dam safety review")).toBeVisible();
+  });
+
+  test("discards a rename on Escape", async ({ page }) => {
+    const id = await seedNotebook(page);
+    await page.goto(`/notebook/${id}`);
+
+    const heading = page.getByRole("heading", { level: 1 });
+    await heading.getByRole("button").click();
+
+    const field = page.getByRole("textbox", { name: /notebook title/i });
+    await field.fill("Thrown away");
+    await field.press("Escape");
+
+    await expect(heading).toContainText("Kestrel Dam Report");
+  });
+
   test("switches language and keeps the notebook usable", async ({ page }) => {
     const id = await seedNotebook(page);
     await page.goto(`/notebook/${id}`);

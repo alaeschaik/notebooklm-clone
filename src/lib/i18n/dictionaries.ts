@@ -22,6 +22,7 @@ export const en = {
     copied: "Copied",
     save: "Save",
     download: "Download",
+    rename: "Rename",
     confirm: "Confirm",
     remove: "Remove",
     open: "Open",
@@ -58,6 +59,7 @@ export const en = {
     updated: "Updated",
     untitled: "Untitled notebook",
     open: "Open notebook",
+    renameTitle: "Notebook title",
   },
 
   sources: {
@@ -185,6 +187,7 @@ export const de: Dictionary = {
     copied: "Kopiert",
     save: "Speichern",
     download: "Herunterladen",
+    rename: "Umbenennen",
     confirm: "Bestätigen",
     remove: "Entfernen",
     open: "Öffnen",
@@ -221,6 +224,7 @@ export const de: Dictionary = {
     updated: "Aktualisiert",
     untitled: "Unbenanntes Notizbuch",
     open: "Notizbuch öffnen",
+    renameTitle: "Titel des Notizbuchs",
   },
 
   sources: {
