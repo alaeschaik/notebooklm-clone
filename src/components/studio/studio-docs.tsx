@@ -1,15 +1,17 @@
 "use client";
 
-import { AlertCircle, FileText, Trash2 } from "lucide-react";
+import { AlertCircle, Download, FileText, Trash2 } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
 
 import { Answer } from "@/components/chat/answer";
+import { Button } from "@/components/ui/button";
 import { StudioCard } from "@/components/studio/studio-card";
 import { IconButton } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { fetcher } from "@/hooks/use-api";
+import { downloadText, toFilename, toMarkdownDocument } from "@/lib/download";
 import { useT } from "@/lib/i18n/context";
 import type { CitationMarker, HighlightTarget, StoredCitation } from "@/lib/types";
 
@@ -70,6 +72,19 @@ export function StudioDocs({
     }
   }
 
+  function download(doc: Doc) {
+    downloadText(
+      toFilename(doc.title, "md"),
+      toMarkdownDocument({
+        title: doc.title,
+        content: doc.content,
+        citations: doc.citations ?? [],
+        markers: doc.markers ?? [],
+        sourcesHeading: t.chat.citationsLabel,
+      }),
+    );
+  }
+
   async function remove(docId: string) {
     await fetch(`/api/notebooks/${notebookId}/studio?docId=${docId}`, {
       method: "DELETE",
@@ -111,6 +126,16 @@ export function StudioDocs({
                 )}
                 <span className="truncate text-xs font-medium">{doc.title}</span>
               </button>
+              {doc.status === "ready" && (
+                <IconButton
+                  title={t.common.download}
+                  size="icon-sm"
+                  onClick={() => download(doc)}
+                  className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <Download className="size-3" />
+                </IconButton>
+              )}
               <IconButton
                 title={t.common.delete}
                 size="icon-sm"
@@ -129,6 +154,14 @@ export function StudioDocs({
         onClose={() => setOpenDoc(null)}
         title={openDoc?.title ?? ""}
         className="w-[min(48rem,calc(100vw-2rem))]"
+        footer={
+          openDoc ? (
+            <Button size="sm" onClick={() => download(openDoc)}>
+              <Download className="size-3.5" />
+              {t.common.download}
+            </Button>
+          ) : null
+        }
       >
         {openDoc && (
           <div className="max-h-[70vh] overflow-y-auto">

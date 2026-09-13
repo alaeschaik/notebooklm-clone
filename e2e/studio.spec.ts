@@ -24,4 +24,36 @@ test.describe("studio", () => {
     // No reload between the save and this assertion.
     await expect(page.getByText(/answers you save will appear here/i)).toHaveCount(0);
   });
+
+  test("downloads a generated document as Markdown", async ({ page }) => {
+    const id = await seedNotebook(page);
+    await page.goto(`/notebook/${id}`);
+
+    await page.getByRole("button", { name: /^faq$/i }).click();
+
+    // Generation is asynchronous; the row becomes clickable once it is ready.
+    const row = page.getByRole("button", { name: /^faq$/i }).last();
+    await expect(row).toBeEnabled({ timeout: 180_000 });
+    await expect(page.getByTitle(/download/i).first()).toBeVisible({
+      timeout: 180_000,
+    });
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByTitle(/download/i).first().click(),
+    ]);
+
+    expect(download.suggestedFilename()).toMatch(/\.md$/);
+
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+    const markdown = Buffer.concat(chunks).toString("utf8");
+
+    expect(markdown).toMatch(/^# /);
+    // Citations are the point of the app; a download that dropped them would
+    // be a worse artefact than the screen it came from.
+    expect(markdown).toContain("## Sources");
+    expect(markdown).toMatch(/\[\d\]/);
+  });
 });
