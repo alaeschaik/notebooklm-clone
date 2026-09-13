@@ -23,10 +23,11 @@ import { IconButton } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm";
 import { EmptyState, Panel, PanelBody } from "@/components/ui/panel";
 import { Spinner } from "@/components/ui/spinner";
-import { useMessages } from "@/hooks/use-api";
+import { notesKey, useMessages } from "@/hooks/use-api";
 import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n/context";
 import { readEventStream } from "@/lib/sse";
+import { mutate as globalMutate } from "swr";
 import type {
   CitationMarker,
   HighlightTarget,
@@ -444,7 +445,7 @@ function SaveToNotes({
   const [saved, setSaved] = useState(false);
 
   async function save() {
-    await fetch(`/api/notebooks/${notebookId}/notes`, {
+    await fetch(notesKey(notebookId), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -456,6 +457,10 @@ function SaveToNotes({
       }),
     });
     setSaved(true);
+    // The note is written from the chat pane but displayed in the studio pane,
+    // which reads its own cache entry. Without this the note only appears after
+    // a reload, and the save looks like it did nothing.
+    await globalMutate(notesKey(notebookId));
   }
 
   return (

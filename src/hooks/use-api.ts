@@ -2,8 +2,7 @@
 
 import useSWR, { type SWRConfiguration } from "swr";
 
-import type { Source } from "@/lib/types";
-import type { StoredMessage } from "@/lib/types";
+import type { Note, Source, StoredMessage } from "@/lib/types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -41,6 +40,18 @@ export function useSources(
   );
 
   return { ...result, sources: result.data?.sources ?? [] };
+}
+
+/**
+ * Exported so anything that writes a note can revalidate the same cache entry
+ * the panel reads from. Saving an answer happens in the chat pane and the notes
+ * live in the studio pane, so without a shared key the two drift until reload.
+ */
+export const notesKey = (notebookId: string) => `/api/notebooks/${notebookId}/notes`;
+
+export function useNotes(notebookId: string) {
+  const result = useSWR<{ notes: Note[] }>(notesKey(notebookId), fetcher);
+  return { ...result, notes: result.data?.notes ?? [] };
 }
 
 export function useMessages(notebookId: string, initial?: StoredMessage[]) {

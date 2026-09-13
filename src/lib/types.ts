@@ -35,6 +35,16 @@ export type StoredMessage = {
   createdAt: string;
 };
 
+export type Note = {
+  id: string;
+  title: string;
+  content: string;
+  origin: "manual" | "chat" | "studio";
+  citations: StoredCitation[] | null;
+  markers: CitationMarker[] | null;
+  createdAt: string;
+};
+
 /** Where the reader should scroll to and highlight. */
 export type HighlightTarget = {
   sourceId: string;

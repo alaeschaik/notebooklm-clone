@@ -2,26 +2,15 @@
 
 import { NotebookPen, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import useSWR from "swr";
 
 import { Answer } from "@/components/chat/answer";
 import { StudioCard } from "@/components/studio/studio-card";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Dialog } from "@/components/ui/dialog";
-import { fetcher } from "@/hooks/use-api";
+import { useNotes } from "@/hooks/use-api";
 import { useT } from "@/lib/i18n/context";
-import type { CitationMarker, HighlightTarget, StoredCitation } from "@/lib/types";
-
-type Note = {
-  id: string;
-  title: string;
-  content: string;
-  origin: "manual" | "chat" | "studio";
-  citations: StoredCitation[] | null;
-  markers: CitationMarker[] | null;
-  createdAt: string;
-};
+import type { HighlightTarget, Note } from "@/lib/types";
 
 export function NotesCard({
   notebookId,
@@ -35,11 +24,7 @@ export function NotesCard({
   const [openNote, setOpenNote] = useState<Note | null>(null);
   const [draft, setDraft] = useState({ title: "", content: "" });
 
-  const { data, mutate } = useSWR<{ notes: Note[] }>(
-    `/api/notebooks/${notebookId}/notes`,
-    fetcher,
-  );
-  const notes = data?.notes ?? [];
+  const { notes, mutate } = useNotes(notebookId);
 
   async function create() {
     if (!draft.content.trim()) return;
