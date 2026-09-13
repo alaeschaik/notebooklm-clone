@@ -9,6 +9,23 @@ footnote-shaped decoration.
 
 ---
 
+## What it does
+
+- **Sources** — PDF (page-labelled), web articles, YouTube transcripts, pasted
+  text. Each shows real ingestion state, and a failure says what went wrong.
+- **Grounded chat** — streamed answers, scoped to the sources you tick. Every
+  claim carries a citation; clicking one opens the source at the exact sentence.
+- **Studio** — briefing doc, study guide, FAQ and timeline, all cited and
+  downloadable as Markdown; an interactive mind map; and notes, which keep the
+  citations of the answer they were saved from.
+- **Audio Overview** — a two-host podcast generated from the sources, with a
+  synced transcript.
+- **German and English** — the interface and the generated output both follow
+  the language you pick.
+- **Read-only share links** — send a notebook to someone with no account.
+
+---
+
 ## The core idea
 
 NotebookLM's whole value is *grounded answers you can check*. Most clones
