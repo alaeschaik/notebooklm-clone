@@ -73,24 +73,89 @@ migrations once before rolling out, so instances cannot race each other.
 
 ## Behind a reverse proxy
 
-The app reads `X-Forwarded-Proto` and `X-Forwarded-Host` to build share links,
-so forward both or shared URLs will point at the wrong origin.
+Two things must be right or the app misbehaves in ways that look like bugs:
 
-```nginx
-location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_set_header Host              $host;
-    proxy_set_header X-Forwarded-Host  $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # Answers stream over SSE; buffering holds them until the response ends.
-    proxy_buffering off;
-    proxy_read_timeout 300s;
-}
-```
+- **Forward the original host and scheme.** Share links are built from them, so
+  without them the links point at the container instead of your domain.
+- **Turn off response buffering.** Answers stream over SSE. With buffering on,
+  nothing appears until the whole answer is finished.
 
 Serve it over HTTPS. The session cookie is `Secure` in production, so over plain
 HTTP the browser discards it and every request looks like a new visitor.
+
+### Nginx Proxy Manager
+
+**1. Put NPM and the app on the same Docker network.** Then NPM can reach the
+container by name and the app needs no published port at all.
+
+Create `docker-compose.override.yml` next to the compose file:
+
+```yaml
+services:
+  app:
+    # Reached as http://notebook-app:3000 from NPM; drop the host port so the
+    # app is only reachable through the proxy.
+    container_name: notebook-app
+    ports: !override []
+    networks: [default, npm]
+
+networks:
+  npm:
+    external: true
+    name: <the network your NPM container is on>
+```
+
+Find that network with `docker inspect <npm-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'`.
+
+If you would rather not touch networking, leave the published port and point NPM
+at your host's LAN IP with port `3000` instead — but then close 3000 at the
+firewall so it is not reachable from outside.
+
+**2. Add the Proxy Host** — *Hosts → Proxy Hosts → Add Proxy Host*.
+
+| Field | Value |
+|---|---|
+| Domain Names | `notebook.example.com` |
+| Scheme | `http` — TLS terminates at NPM |
+| Forward Hostname / IP | `notebook-app` (or your host IP) |
+| Forward Port | `3000` |
+| Cache Assets | **off** — Next already sets correct cache headers, and NPM's rules can serve stale hashed assets |
+| Block Common Exploits | on |
+| Websockets Support | on — harmless, and needed if you ever proxy `next dev` |
+
+**3. SSL tab.** Request a new Let's Encrypt certificate, then enable **Force
+SSL** and **HTTP/2**. Without Force SSL the session cookie never sticks.
+
+**4. Advanced tab.** Paste this:
+
+```nginx
+# Answers stream over SSE; buffering holds the whole response back.
+proxy_buffering off;
+proxy_cache off;
+
+# Ingestion and generation take minutes, well past the 60s default.
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+
+# Uploads are capped at 25 MB by the app.
+client_max_body_size 32m;
+```
+
+Only directives that inherit into the location block belong here. NPM sets its
+own `proxy_set_header` lines inside `location /`, and nginx does not merge those
+across levels — anything you add here would be ignored. That is fine: NPM
+already sends `Host` and `X-Forwarded-Proto`, which is exactly what the app
+needs.
+
+### Verifying the proxy
+
+```bash
+curl -sI https://notebook.example.com/api/health     # 200
+```
+
+Then in the browser: ask a question and watch the answer appear **word by
+word**. If it lands all at once, buffering is still on. Create a share link and
+check the URL shows your domain rather than an internal address.
 
 ## Verifying a deployment
 
