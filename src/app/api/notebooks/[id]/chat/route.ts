@@ -4,7 +4,8 @@ import { assertUuids, badRequest, handleRouteError, readJson, requireOwnedNotebo
 import { CitationResolver } from "@/lib/ai/citations";
 import { getClaude, groundedDefaults } from "@/lib/ai/claude";
 import { buildContext } from "@/lib/ai/context";
-import { CHAT_SYSTEM } from "@/lib/ai/prompts";
+import { chatSystem } from "@/lib/ai/prompts";
+import { getLocale } from "@/lib/i18n/server";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, type CitationMarker, type StoredCitation } from "@/lib/db/schema";
 
@@ -68,6 +69,10 @@ export async function POST(
       scopedSourceIds: sourceIds,
     });
 
+    // Read before the stream opens: request-scoped APIs are not available
+    // inside the ReadableStream's callbacks.
+    const locale = await getLocale();
+
     const resolver = new CitationResolver(context.refs, {
       segmentsBySource: context.segmentsBySource,
     });
@@ -95,7 +100,7 @@ export async function POST(
             // to open reasoning, so a low effort keeps the notebook feeling
             // responsive without measurably hurting the answers.
             output_config: { effort: "low" },
-            system: CHAT_SYSTEM,
+            system: chatSystem(locale),
             messages: [
               ...history.map((turn) => ({
                 role: turn.role,

@@ -63,3 +63,25 @@ test.describe("grounded answers", () => {
     await expect(page.getByText(/^sources$/i).nth(1)).toHaveCount(0);
   });
 });
+
+test.describe("answer language", () => {
+  test.slow();
+
+  test("answers in the language of the question, not of the sources", async ({ page }) => {
+    // Regression: a German-looking source name was enough to make an English
+    // question come back answered in German.
+    const id = await seedNotebook(page);
+    await page.goto(`/notebook/${id}`);
+
+    await page
+      .getByPlaceholder(/ask anything/i)
+      .fill("What did the 2024 sediment survey measure?");
+    await page.keyboard.press("Enter");
+
+    const answer = page.locator(".prose-answer").last();
+    await expect(answer).toBeVisible({ timeout: 120_000 });
+    await expect(answer).toContainText(/61 million/i, { timeout: 120_000 });
+    // German would render these instead.
+    await expect(answer).not.toContainText(/Millionen|Tonnen|ergaben/);
+  });
+});
