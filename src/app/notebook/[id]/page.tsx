@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { NotebookWorkspace } from "@/components/notebook-workspace";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, sources } from "@/lib/db/schema";
-import { getOrigin } from "@/lib/origin";
+import { getOrigin } from "@/lib/origin-server";
 import { getVisitorId } from "@/lib/session-server";
 import type { Source, StoredMessage } from "@/lib/types";
 

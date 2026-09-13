@@ -1,3 +1,4 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { desc, eq } from "drizzle-orm";
 
 import { assertUuids, badRequest, handleRouteError, readJson, requireOwnedNotebook } from "@/lib/api";
@@ -77,11 +78,20 @@ export async function POST(
       segmentsBySource: context.segmentsBySource,
     });
 
+    // Hoisted so `cancel` can reach them when the client disconnects.
+    let upstream: ReturnType<Anthropic["beta"]["messages"]["stream"]> | undefined;
+    let disconnected = false;
+
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const encoder = new TextEncoder();
-        const send = (event: ChatEvent) =>
+        // Enqueueing onto a controller the runtime already closed throws, and
+        // that happens on every client disconnect. Silence is the right answer:
+        // there is nobody left to send to.
+        const send = (event: ChatEvent) => {
+          if (disconnected) return;
           controller.enqueue(encoder.encode(encodeEvent(event)));
+        };
 
         let answer = "";
         const markers: CitationMarker[] = [];
@@ -93,7 +103,7 @@ export async function POST(
             documents: context.blocks.length,
           });
 
-          const claude = getClaude().beta.messages.stream({
+          const claude = (upstream = getClaude().beta.messages.stream({
             ...groundedDefaults(),
             max_tokens: 8000,
             // Answering from supplied documents is closer to extraction than
@@ -114,7 +124,7 @@ export async function POST(
                 ],
               },
             ],
-          });
+          }));
 
           // Citations for the block currently being streamed. They cannot be
           // positioned as they arrive: Claude emits a block's citations before
@@ -168,16 +178,27 @@ export async function POST(
 
           send({ type: "done", messageId: saved.id });
         } catch (error) {
-          console.error("[chat] stream failed", error);
-          // The response is already a 200 by this point, so the error has to
-          // be delivered in-band for the client to be able to show it.
-          send({
-            type: "error",
-            message: "The answer could not be completed. Please try again.",
-          });
+          // A disconnect surfaces here as an abort. That is the user leaving,
+          // not a failure, and logging it as one buries the real ones.
+          if (!disconnected) {
+            console.error("[chat] stream failed", error);
+            // The response is already a 200 by this point, so the error has to
+            // travel in-band for the client to be able to show it.
+            send({
+              type: "error",
+              message: "The answer could not be completed. Please try again.",
+            });
+          }
         } finally {
-          controller.close();
+          if (!disconnected) controller.close();
         }
+      },
+
+      cancel() {
+        // The reader is gone — stop generating rather than paying for an
+        // answer nobody will read.
+        disconnected = true;
+        upstream?.abort();
       },
     });
 

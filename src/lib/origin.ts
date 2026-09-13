@@ -1,15 +1,25 @@
-import { headers } from "next/headers";
+/** Proxies may chain and append, so a forwarded header can carry a list. */
+function first(value: string | null): string | null {
+  return value?.split(",")[0]?.trim() || null;
+}
+
+function isLoopback(host: string): boolean {
+  return /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host);
+}
 
 /**
- * Request origin, read server-side. Client components are server-rendered
- * first, where `window` does not exist, and deferring to an effect would
- * render one value on the server and another after hydration.
+ * Builds the request origin from headers. Share links are made from this, so
+ * behind a reverse proxy it has to reflect the public address rather than the
+ * container's. Nginx Proxy Manager sets `Host` and `X-Forwarded-Proto`;
+ * `X-Forwarded-Host` is honoured first for proxies that rewrite `Host`.
  */
-export async function getOrigin(): Promise<string> {
-  const list = await headers();
-  const host = list.get("x-forwarded-host") ?? list.get("host") ?? "localhost:3000";
-  const protocol =
-    list.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+export function originFromHeaders(
+  get: (name: string) => string | null,
+): string {
+  const host = first(get("x-forwarded-host")) ?? first(get("host")) ?? "localhost:3000";
+  // Assume TLS unless told otherwise, since only local development is plain
+  // HTTP — guessing wrong the other way hands out unreachable links.
+  const protocol = first(get("x-forwarded-proto")) ?? (isLoopback(host) ? "http" : "https");
 
   return `${protocol}://${host}`;
 }
