@@ -44,13 +44,9 @@ export function AudioOverviewCard({
   const driving = useRef(false);
 
   /**
-   * Renders one segment per request until the overview finishes.
-   *
-   * Paced from here rather than run server-side in one pass because free-tier
-   * speech synthesis is rate limited per minute: a full overview spends most of
-   * its wall clock waiting, which would exceed a serverless function's ceiling.
-   * Driving it from the client also makes each step visible instead of leaving
-   * the user watching one spinner for five minutes.
+   * Renders one segment per request until the overview finishes. Paced here
+   * rather than server-side because the free tier is rate limited, and because
+   * it turns a five-minute spinner into visible progress.
    */
   const drive = useCallback(async () => {
     if (driving.current) return;

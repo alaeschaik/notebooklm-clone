@@ -52,14 +52,10 @@ export async function GET(
 }
 
 /**
- * Writes the script and plans the segments, but renders nothing.
- *
- * Rendering is driven segment by segment from the client instead (see
- * `audio/render`). Free-tier speech synthesis is rate limited to a few requests
- * per minute, so a five-minute overview spends most of its wall clock waiting —
- * comfortably past the platform's function ceiling if it were one request.
- * Splitting it also means a rate-limited segment retries on its own rather than
- * taking the whole overview down with it.
+ * Writes the script and plans the segments; renders nothing. The client drives
+ * rendering one segment at a time (see `audio/render`), because free-tier
+ * speech synthesis is rate limited and a rate-limited segment should retry on
+ * its own rather than take the whole overview down.
  */
 export async function POST(
   request: Request,

@@ -1,18 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AnthropicBeta } from "@anthropic-ai/sdk/resources/beta";
 
-/**
- * Opus 5 is used throughout. Grounded answering with citations is the app's
- * core promise, and a weaker model both cites less precisely and is more
- * willing to answer from parametric knowledge instead of the sources.
- */
+/** A weaker model cites less precisely and leans harder on its own knowledge. */
 export const MODEL = "claude-opus-5";
 
 /**
- * Routes a refused request to a suitable alternative model server-side rather
- * than surfacing an error. Notebooks can legitimately contain material that
- * trips a safety classifier — medical, legal or security documents — and the
- * user's own uploaded source is not a reason to fail their question.
+ * Reroutes a refusal server-side instead of failing. Notebooks legitimately
+ * hold medical, legal or security material, which is no reason to refuse.
  */
 export const FALLBACK_BETA = "server-side-fallback-2026-07-01" as const;
 

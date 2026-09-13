@@ -1,12 +1,7 @@
 /**
- * Applies pending database migrations once, when the server boots.
- *
- * Self-hosting this app should be `docker compose up`, not `docker compose up`
- * followed by remembering to exec a migration command. Running them here keeps
- * the schema and the code that expects it deployed together.
- *
- * Set RUN_MIGRATIONS_ON_BOOT=false to manage migrations separately — which is
- * what you would want as soon as more than one instance starts at a time.
+ * Applies pending migrations on boot, so deploying is `docker compose up` and
+ * the schema ships with the code expecting it. Set RUN_MIGRATIONS_ON_BOOT=false
+ * when more than one instance starts at once.
  */
 export async function register() {
   // Only the Node.js server runtime can reach the database.
@@ -23,8 +18,7 @@ export async function register() {
     await migrate(getDb(), { migrationsFolder: "./drizzle" });
     console.log("[migrate] database schema is up to date");
   } catch (error) {
-    // Deliberately fatal: serving requests against a schema the code does not
-    // match produces confusing failures far from the real cause.
+    // Fatal on purpose: a schema the code does not match fails far from here.
     console.error("[migrate] failed to apply migrations", error);
     await getPool().end().catch(() => {});
     throw error;

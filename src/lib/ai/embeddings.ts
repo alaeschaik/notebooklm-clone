@@ -3,17 +3,11 @@ import { GoogleGenAI } from "@google/genai";
 import { EMBEDDING_DIMENSIONS } from "@/lib/db/schema";
 
 /**
- * Gemini rather than OpenAI, for two reasons: a Gemini key is already required
- * for the audio overview, so this removes a third provider from the setup; and
- * its embedding endpoint is available on the free tier, which means a reviewer
- * can clone the repo and get working retrieval without a paid account.
+ * Gemini rather than OpenAI: a Gemini key is already needed for audio, and its
+ * embedding endpoint is on the free tier.
  *
- * `gemini-embedding-001` supports an explicit output dimensionality, and 1536
- * is what the `chunks.embedding` column is declared as.
- *
- * Changing this model — or the provider — invalidates every stored vector.
- * Embeddings from different models are not comparable, so a switch requires
- * re-ingesting existing sources, not just a redeploy.
+ * Changing this model invalidates every stored vector — embeddings from
+ * different models are not comparable — so a switch means re-ingesting.
  */
 export const EMBEDDING_MODEL = "gemini-embedding-001";
 
@@ -26,16 +20,13 @@ const MAX_INPUT_CHARS = 30_000;
 let client: GoogleGenAI | undefined;
 
 /**
- * Embeddings are an enhancement, not a requirement. Without a key the semantic
- * half of hybrid retrieval is simply absent and ranking falls back to full-text
- * alone — and notebooks small enough to be sent in full never consult the index
- * at all. Failing hard would make an optional provider a hard dependency.
+ * Embeddings are an enhancement. Without a key, ranking falls back to full-text
+ * alone, and notebooks small enough to be sent whole never touch the index.
  */
 function embeddingsEnabled(): boolean {
+  // .env.example ships a placeholder; treating it as real errors every ingest.
   const key = process.env.GEMINI_API_KEY?.trim();
-  // The template in .env.example ships a placeholder; treat it as absent so a
-  // half-configured checkout degrades instead of erroring on every ingest.
-  return Boolean(key) && key !== "..." && !key!.endsWith("...");
+  return Boolean(key) && !key!.endsWith("...");
 }
 
 function getClient(): GoogleGenAI {
@@ -44,9 +35,8 @@ function getClient(): GoogleGenAI {
 }
 
 /**
- * Gemini distinguishes the two sides of a retrieval pair. Embedding a question
- * as a document — or the reverse — measurably degrades matching, because a
- * question and the passage answering it are not paraphrases of one another.
+ * Gemini distinguishes the two sides of a retrieval pair. A question and the
+ * passage answering it are not paraphrases, and embedding them alike hurts.
  */
 type TaskType = "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
 
@@ -93,10 +83,8 @@ export async function embedAll(
     try {
       vectors.push(...(await embedBatch(batch, taskType)));
     } catch (error) {
-      // A source that ingests without vectors is still readable, citable and
-      // answerable; a source that fails to ingest is useless. So an embedding
-      // outage degrades retrieval instead of losing the document — loudly,
-      // because it does mean a real loss of ranking quality.
+      // A source without vectors is still readable and citable; a source that
+      // failed to ingest is useless. Loud, because ranking quality does drop.
       console.error(
         "[embeddings] request failed — storing this batch without vectors; retrieval falls back to full-text",
         error,

@@ -9,10 +9,8 @@ import { embedQuery } from "./embeddings";
 import { retrieveChunks } from "./retrieval";
 
 /**
- * Below this many tokens the whole notebook is sent verbatim instead of being
- * retrieved over. Retrieval can only lose information, so it is worth avoiding
- * while the sources still fit comfortably inside the context window — and with
- * the documents cached, follow-up questions cost little more than a short one.
+ * Below this, the notebook is sent whole rather than retrieved over: retrieval
+ * can only lose information, and caching makes follow-ups cheap anyway.
  */
 export const FULL_CONTEXT_TOKEN_BUDGET = 180_000;
 
@@ -91,12 +89,8 @@ function documentBlock({
 }
 
 /**
- * Assembles the grounding documents for a question.
- *
- * Small notebooks are sent whole; larger ones go through hybrid retrieval.
- * Both paths produce the same pair of parallel arrays — the blocks Claude
- * sees and the refs needed to map its citations back — so everything
- * downstream is identical regardless of which path ran.
+ * Grounding documents for a question. Both paths emit the same parallel
+ * blocks/refs arrays, so nothing downstream knows which one ran.
  */
 export async function buildContext({
   notebookId,

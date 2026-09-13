@@ -11,14 +11,9 @@ export const HOSTS = [
 ] as const;
 
 /**
- * Characters of dialogue rendered per TTS request.
- *
- * This trades off two opposing limits. Voice consistency drifts over long
- * single generations, which argues for small segments — but Gemini's free tier
- * allows only ten TTS requests *per day*, so a script split into six segments
- * spends most of a day's quota on one overview. At 2500 characters a typical
- * script is two requests, which stays well inside the model's context window
- * and keeps each generation short enough to hold a voice steady.
+ * Characters per TTS request, balancing two limits: voices drift over long
+ * generations, but the free tier allows only ten requests *per day*. At 2500
+ * a typical script is two requests.
  */
 export const SEGMENT_MAX_CHARS = 2500;
 
@@ -30,9 +25,8 @@ export function normaliseSpeaker(speaker: string): string {
 }
 
 /**
- * Groups turns into renderable segments. A turn is never split: cutting a
- * sentence across two TTS requests produces an audible seam mid-word, whereas a
- * seam between speakers is inaudible.
+ * Groups turns into segments, never splitting one: a seam between speakers is
+ * inaudible, a seam mid-sentence is not.
  */
 export function segmentScript(
   turns: DialogueTurn[],
@@ -70,11 +64,7 @@ export function segmentScript(
   return segments;
 }
 
-/**
- * Renders one segment as the transcript Gemini's multi-speaker mode expects:
- * a plain conversation where each line is prefixed with a speaker name that
- * matches the voice configuration sent alongside it.
- */
+/** The transcript shape multi-speaker TTS expects: one speaker-prefixed line each. */
 export function segmentPrompt(turns: DialogueTurn[]): string {
   const lines = turns
     .map((turn) => `${normaliseSpeaker(turn.speaker)}: ${turn.text.trim()}`)

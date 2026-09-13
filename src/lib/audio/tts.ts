@@ -6,14 +6,11 @@ import { HOSTS, segmentPrompt } from "./script";
 import { DEFAULT_PCM, type PcmFormat } from "./wav";
 
 /**
- * Gemini's multi-speaker mode renders both hosts in a single request, which is
- * what makes the result sound like a conversation. Rendering each speaker
- * separately and interleaving the clips produces recognisably robotic
- * turn-taking, because neither voice hears the other's delivery.
+ * Multi-speaker mode renders both hosts in one request, which is what makes it
+ * sound like a conversation rather than two clips interleaved.
  *
- * This uses `generateContent` rather than the newer Interactions API: the TTS
- * preview models reject every audio MIME type Interactions offers, and only
- * speak through the classic endpoint, which returns raw PCM.
+ * Uses `generateContent`, not the Interactions API: the TTS preview models
+ * reject every audio MIME type Interactions offers.
  */
 export const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
@@ -68,11 +65,7 @@ function isRateLimit(error: unknown): boolean {
   return message.includes("429") || /quota|rate limit/i.test(message);
 }
 
-/**
- * A per-day quota does not clear within the life of a request, so retrying
- * against it only burns the remaining attempts and delays an error the user
- * needs to see. Per-minute limits do clear, and are worth waiting out.
- */
+/** A daily quota will not clear mid-request; retrying only delays the error. */
 function isDailyQuota(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /PerDay|per day|free_tier_requests/i.test(message);

@@ -8,14 +8,9 @@ import { cn } from "@/lib/cn";
 import { useT } from "@/lib/i18n/context";
 
 /**
- * The notebook's name, editable in place.
- *
- * A notebook is created before there is anything to name it after and then
- * takes the name of its first source, which is a reasonable guess and often the
- * wrong one — a file called `Lebenslauf_Ali_Rehan_Sheikh.pdf` should not be the
- * title forever. Editing happens here rather than in a settings dialog because
- * the title is already on screen; clicking the thing you want to change is the
- * shortest path there is.
+ * The notebook's name, editable in place. It is seeded from the first source,
+ * which is a guess and often wrong, so it has to be changeable — and the title
+ * is already on screen, which makes a settings dialog the longer way round.
  */
 export function NotebookTitle({
   notebookId,

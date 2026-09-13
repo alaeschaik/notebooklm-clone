@@ -2,20 +2,13 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * Rendered audio needs somewhere to live that is not the database — a few
- * minutes of PCM-derived WAV is megabytes, which is the wrong shape for a row.
- *
- * Files go to a directory on disk, which in the container is a mounted volume
- * so audio survives a rebuild. Everything is addressed by key; callers never
- * construct paths themselves.
+ * Rendered audio is megabytes per overview — the wrong shape for a database
+ * row. Files go to a directory that is a mounted volume in the container, so
+ * they survive a rebuild. Callers address them by key, never by path.
  */
 const ROOT = path.resolve(process.env.STORAGE_DIR ?? path.join(process.cwd(), ".data", "blobs"));
 
-/**
- * Resolves a key to a path inside the storage root, refusing anything that
- * escapes it. Keys embed ids the caller supplies, so this is the one place
- * that has to be certain about traversal.
- */
+/** The one place a key becomes a path, so the one place traversal is checked. */
 function resolveKey(key: string): string | null {
   const target = path.resolve(ROOT, key);
   return target === ROOT || target.startsWith(ROOT + path.sep) ? target : null;

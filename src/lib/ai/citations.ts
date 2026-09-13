@@ -3,13 +3,9 @@ import type { TextCitation } from "@anthropic-ai/sdk/resources/messages";
 import type { SourceSegment, StoredCitation } from "@/lib/db/schema";
 
 /**
- * One document block as sent to Claude, plus what is needed to translate a
- * citation about it back into coordinates in the original source.
- *
- * Claude reports citations relative to the document it was given. In retrieval
- * mode that document is a single chunk, so its offsets have to be shifted by
- * where the chunk sits in the source; in full-source mode the shift is zero.
- * Both cases are the same arithmetic, which is why they share this type.
+ * A document block as sent to Claude, plus what maps a citation about it back
+ * to the source. In retrieval mode the document is one chunk, so offsets shift
+ * by where it sits; in full-source mode the shift is zero. Same arithmetic.
  */
 export type DocumentRef = {
   sourceId: string;
@@ -20,12 +16,7 @@ export type DocumentRef = {
   offsetInSource: number;
 };
 
-/**
- * The citation variants that refer to a document we supplied. The wider
- * `TextCitation` union also covers web-search and search-result locations,
- * which carry no `document_index` and cannot occur here — this app never
- * enables those tools.
- */
+/** Citations naming a document we supplied; the union also covers web search. */
 export type DocumentCitation = Extract<TextCitation, { document_index: number }>;
 
 function isDocumentCitation(
@@ -53,12 +44,8 @@ export function labelForOffset(
 }
 
 /**
- * Collects citations as they stream in, resolving each to an absolute range in
- * its source and assigning the 1-based markers rendered inline in the answer.
- *
- * Repeat citations of the same passage reuse their original marker, so an
- * answer that leans on one sentence three times shows [1] three times rather
- * than [1][2][3].
+ * Resolves streaming citations to absolute source ranges and numbers them.
+ * A passage cited three times keeps one marker, not three.
  */
 export class CitationResolver {
   private readonly refs: DocumentRef[];
@@ -72,10 +59,8 @@ export class CitationResolver {
   }
 
   /**
-   * Resolves one raw citation. Returns the stored citation — which may be an
-   * existing one if this passage was already cited — or `null` when it cannot
-   * be attributed to a source, in which case the answer simply shows no marker
-   * rather than a marker pointing somewhere arbitrary.
+   * Returns the citation, reusing an existing marker for a repeated passage,
+   * or `null` when it cannot be attributed — better no marker than a wrong one.
    */
   add(raw: TextCitation): StoredCitation | null {
     if (!isDocumentCitation(raw)) return null;
@@ -128,13 +113,9 @@ function claimedRange(
 }
 
 /**
- * Finds where a quote actually sits in the document text.
- *
- * The claimed offsets are trusted only when they genuinely produce the quoted
- * text. Otherwise the quote is searched for directly — which also covers
- * citation types that carry no character offsets at all, such as page
- * locations. Verifying rather than trusting is what stops a highlight from
- * landing on the wrong sentence.
+ * Offsets are trusted only when they actually produce the quoted text;
+ * otherwise the quote is searched for. Verifying rather than trusting is what
+ * keeps a highlight off the neighbouring sentence.
  */
 function locate(
   text: string,

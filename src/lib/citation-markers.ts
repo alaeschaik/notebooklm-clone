@@ -1,30 +1,20 @@
 import type { CitationMarker } from "@/lib/db/schema";
 
 /**
- * Citation markers are woven into the answer text as sentinels before it is
- * parsed as Markdown, then swapped for interactive chips while rendering.
+ * Markers are woven in as sentinels before Markdown parsing, then swapped for
+ * chips while rendering. The reverse is impossible: parsing discards the
+ * character offsets the markers are expressed in.
  *
- * Doing it the other way round is not possible: parsing discards the character
- * offsets the markers are expressed in, so by the time there is a tree to walk,
- * the positions no longer correspond to anything in it.
- *
- * U+2062 (invisible times) is used as the delimiter because it survives
- * Markdown parsing untouched and cannot appear in model output.
+ * U+2062 survives Markdown untouched and cannot appear in model output.
  */
 const DELIMITER = "⁢";
 
 export const MARKER_PATTERN = new RegExp(`${DELIMITER}(\\d+)${DELIMITER}`, "g");
 
 /**
- * Nudges a marker past the punctuation that closes its sentence.
- *
- * Claude ends a cited text block at the last word it is citing, leaving the
- * full stop to begin the next block — so a marker placed at the raw offset
- * renders as "38 million tonnes [1]." A reader expects "[1]" after the stop,
- * not wedged in front of it.
- *
- * Only advances when punctuation actually follows, so a marker in the middle
- * of a sentence stays exactly where it was put.
+ * Claude ends a cited block at the last cited word, leaving the full stop to
+ * open the next one — so the raw offset renders as "61 million tonnes [1]."
+ * Only advances when punctuation actually follows.
  */
 function settleAfterPunctuation(text: string, position: number): number {
   const trailing = /^[ \t]*[.,;:!?)\]"'\u201d\u2019]+/.exec(text.slice(position));
@@ -32,8 +22,7 @@ function settleAfterPunctuation(text: string, position: number): number {
 }
 
 export function weaveMarkers(text: string, markers: CitationMarker[]): string {
-  // Applied back to front so each insertion leaves the earlier offsets — which
-  // were computed against the original string — still valid.
+  // Back to front, so each insertion leaves the earlier offsets valid.
   return [...markers]
     .map((marker) => ({
       ...marker,

@@ -23,14 +23,9 @@ function toVectorLiteral(embedding: number[]): string {
 }
 
 /**
- * Hybrid retrieval: semantic similarity and lexical matching are ranked
- * independently, then combined with reciprocal rank fusion.
- *
- * Neither arm is sufficient alone. Embeddings miss exact identifiers — a part
- * number or a surname is semantically bland but is often precisely what the
- * question is about. Full-text misses paraphrase, which is most questions.
- * Fusing ranks rather than scores avoids having to calibrate two
- * incomparable score scales against each other.
+ * Semantic and lexical ranked independently, then fused with RRF. Embeddings
+ * miss exact identifiers — a part number is bland but often the whole question;
+ * full-text misses paraphrase. Fusing ranks avoids calibrating two score scales.
  */
 export async function retrieveChunks({
   notebookId,

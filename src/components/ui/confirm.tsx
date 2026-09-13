@@ -26,11 +26,8 @@ const ConfirmContext = createContext<
 >(null);
 
 /**
- * Replaces `window.confirm`, which cannot be styled, ignores the app's
- * language, and renders as an OS chrome dialog that looks nothing like the
- * product around it.
- *
- * The promise-based API keeps call sites as short as the native call was:
+ * Replaces `window.confirm`, which cannot be styled and ignores the app's
+ * language. The promise API keeps call sites as short as the native one:
  * `if (!(await confirm({...}))) return;`
  */
 export function ConfirmProvider({ children }: { children: ReactNode }) {

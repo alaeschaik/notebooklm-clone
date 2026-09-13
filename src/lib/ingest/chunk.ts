@@ -1,13 +1,11 @@
 /**
- * Text is chunked into overlapping ranges of the source's canonical `fullText`.
- *
- * The invariant every consumer relies on is:
+ * Chunks are overlapping ranges of a source's canonical `fullText`, and every
+ * consumer relies on one invariant:
  *
  *     fullText.slice(chunk.startChar, chunk.endChar) === chunk.content
  *
- * Citations are resolved by adding Claude's document-relative offsets to
- * `chunk.startChar`, so if that invariant ever breaks, every highlight in the
- * app silently points at the wrong passage. It is asserted in the tests.
+ * Citations resolve by adding Claude's offsets to `startChar`, so breaking it
+ * silently points every highlight at the wrong passage. The tests assert it.
  */
 
 export type TextSpan = {
