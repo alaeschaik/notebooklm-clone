@@ -19,6 +19,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# `public` is empty and git does not track empty directories, so a fresh clone
+# has none — and the COPY in the runtime stage would fail on it.
+RUN mkdir -p public
+
 # The build never contacts the database or any AI provider: pages are dynamic
 # and every client is constructed lazily. No build-time secrets are needed.
 RUN npm run build
