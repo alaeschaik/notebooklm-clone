@@ -1,0 +1,63 @@
+# Server-side stack. Unlike the root compose file this never builds — it pulls
+# the exact image the pipeline published, so what runs here is byte-for-byte
+# what the tests ran against.
+#
+# Driven by deploy/deploy.sh, which supplies IMAGE and the env file.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-notebook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:-notebook}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notebook} -d ${POSTGRES_DB:-notebook}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  app:
+    image: ${IMAGE:?set by deploy.sh}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-notebook}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-notebook}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?required}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SESSION_SECRET: ${SESSION_SECRET:?required}
+      STORAGE_DIR: /data/blobs
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - blobs:/data
+    ports:
+      - "${APP_PORT:?required}:3000"
+    # The image ships everything it needs; the only writable paths are the
+    # volume and a tmpfs. A container that cannot write to its own filesystem
+    # is a much smaller foothold if the process is ever compromised.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits: { memory: 1g, cpus: "1.5" }
+    logging: *logging
+
+volumes:
+  pgdata:
+  blobs:

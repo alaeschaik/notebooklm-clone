@@ -16,11 +16,19 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await getPool().query("select 1");
-    return NextResponse.json({ status: "ok", database: "up" });
+    return NextResponse.json({
+      status: "ok",
+      database: "up",
+      revision: process.env.GIT_REVISION ?? "unknown",
+    });
   } catch (error) {
     log.error("database unreachable", { error });
     return NextResponse.json(
-      { status: "degraded", database: "down" },
+      {
+        status: "degraded",
+        database: "down",
+        revision: process.env.GIT_REVISION ?? "unknown",
+      },
       { status: 503 },
     );
   }

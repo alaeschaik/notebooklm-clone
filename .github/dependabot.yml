@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Application dependencies. Grouped so a week of patch bumps arrives as one
+  # reviewable pull request instead of fifteen.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # The base image carries most of the CVEs a scan will find, so it is worth
+  # updating on its own cadence.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule: { interval: weekly }
+
+  # Actions are code that runs with repository credentials; pinning them and
+  # then never updating is how a supply-chain issue goes unnoticed.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }

@@ -1,0 +1,38 @@
+# The GitHub Actions runner, on your server.
+#
+# It connects *out* to GitHub, so nothing needs to be reachable from the
+# internet — no inbound SSH, no deploy key in repository secrets. That is the
+# main reason this is a self-hosted runner rather than an SSH deploy.
+#
+#   docker compose -f deploy/docker-compose.runner.yml up -d
+#
+# Needs RUNNER_TOKEN from:
+#   Settings → Actions → Runners → New self-hosted runner
+
+services:
+  runner:
+    image: myoung34/github-runner:latest
+    restart: unless-stopped
+    environment:
+      REPO_URL: ${REPO_URL:?e.g. https://github.com/you/notebooklm-clone}
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?from the repository settings}
+      RUNNER_NAME: ${RUNNER_NAME:-notebook-server}
+      # The pipeline targets [self-hosted, notebook]; this label is what makes
+      # the deploy jobs land on this machine and not somewhere else.
+      LABELS: notebook
+      RUNNER_SCOPE: repo
+      # Re-register on restart, so a recycled container rejoins cleanly.
+      EPHEMERAL: "false"
+      DISABLE_AUTO_UPDATE: "true"
+    volumes:
+      # The runner drives Docker on the host — that is how the deploy job
+      # restarts the app containers alongside it.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner-work:/_work
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  runner-work:

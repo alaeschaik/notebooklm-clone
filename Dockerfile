@@ -33,7 +33,23 @@ RUN npm run build
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production \
+# Passed by CI. Without them a running container cannot be traced back to the
+# commit that produced it, which turns "which version is live?" into guesswork.
+ARG GIT_REVISION=unknown
+ARG BUILD_DATE=unknown
+ARG SOURCE_URL=https://github.com/alaeschaik/notebooklm-clone
+
+LABEL org.opencontainers.image.title="notebook" \
+      org.opencontainers.image.description="Grounded research notebook with verifiable citations" \
+      org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.revision="${GIT_REVISION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.licenses="MIT"
+
+# Readable from inside the container and surfaced by /api/health, so the running
+# version can be confirmed without inspecting the image.
+ENV GIT_REVISION=${GIT_REVISION} \
+    NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
