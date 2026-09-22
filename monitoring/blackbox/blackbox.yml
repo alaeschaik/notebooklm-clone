@@ -1,0 +1,11 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_status_codes: [200]
+      method: GET
+      # Follows the redirect the proxy issues from http to https, so the probe
+      # measures what a visitor experiences rather than the first hop.
+      follow_redirects: true
+      preferred_ip_protocol: ip4

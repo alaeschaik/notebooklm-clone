@@ -1,0 +1,112 @@
+# Observability stack, deliberately its own compose project.
+#
+# It watches the app over the host gateway rather than joining its network, so
+# one instance of this can watch staging and production at once and neither app
+# stack has to know it exists.
+#
+#   cp monitoring/.env.example monitoring/.env
+#   cp monitoring/prometheus/metrics-token.example monitoring/prometheus/metrics-token
+#   docker compose -f monitoring/docker-compose.monitoring.yml up -d
+#
+# The token file must exist before starting: Docker turns a missing bind-mount
+# source into an empty *directory*, and Prometheus then fails to read it.
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # Long enough to see a week-over-week trend, short enough to bound disk
+      # on a small server.
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./prometheus/metrics-token:/etc/prometheus/metrics-token:ro
+      - prometheus-data:/prometheus
+    ports: ["${PROMETHEUS_PORT:-9090}:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports: ["${ALERTMANAGER_PORT:-9093}:9093"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3300}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["${GRAFANA_PORT:-3300}:3000"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:?required}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices: ["/dev/kmsg:/dev/kmsg"]
+    logging: *logging
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /:/rootfs:ro
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.26.0
+    restart: unless-stopped
+    volumes:
+      - ./blackbox/blackbox.yml:/config/blackbox.yml:ro
+    command: ["--config.file=/config/blackbox.yml"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:

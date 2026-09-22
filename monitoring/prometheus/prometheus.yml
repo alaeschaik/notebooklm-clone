@@ -1,0 +1,66 @@
+# Static on purpose: Prometheus does not expand environment variables in its
+# configuration, so anything written as ${VAR} here would be scraped literally.
+# Hostnames and ports are edited in this file; only the scrape credential is
+# read from a separate file so it stays out of version control.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stack: notebook
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+
+  # The application. Reached over the host gateway rather than by container
+  # name, so this stack watches both environments without joining either app's
+  # compose network.
+  - job_name: notebook-app
+    metrics_path: /api/metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics-token
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+        labels: { environment: staging }
+      - targets: ["host.docker.internal:3001"]
+        labels: { environment: production }
+
+  - job_name: postgres
+    static_configs:
+      - targets: [postgres-exporter:9187]
+
+  - job_name: containers
+    static_configs:
+      - targets: [cadvisor:8080]
+
+  - job_name: host
+    static_configs:
+      - targets: [node-exporter:9100]
+
+  # Probes the public URL from outside the app, so a reverse-proxy or TLS
+  # failure shows up even while the container itself reports healthy.
+  # Edit these targets to your hostnames.
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://host.docker.internal:3000/api/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

@@ -1,0 +1,115 @@
+# Every rule states what it means and what to do, because an alert that only
+# says "HighErrorRate" sends whoever is on call hunting for context.
+groups:
+  - name: availability
+    rules:
+      - alert: AppDown
+        expr: up{job="notebook-app"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.environment }} is not being scraped"
+          description: "The app has not answered a scrape for 2 minutes."
+          runbook: "docs/runbook.md#appdown"
+
+      - alert: PublicEndpointDown
+        expr: probe_success == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "Public URL unreachable from outside"
+          description: >-
+            The container may be healthy while the reverse proxy or the
+            certificate is not. Check the proxy before the app.
+          runbook: "docs/runbook.md#publicendpointdown"
+
+      - alert: CertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: "TLS certificate expires in under two weeks"
+          runbook: "docs/runbook.md#certificateexpiringsoon"
+
+  - name: application
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum by (environment) (rate(notebook_http_requests_total{status=~"5.."}[5m]))
+            /
+          sum by (environment) (rate(notebook_http_requests_total[5m]))
+            > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.environment }}: over 5% of requests are failing"
+          runbook: "docs/runbook.md#higherrorrate"
+
+      - alert: SlowRequests
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, environment) (rate(notebook_http_request_duration_seconds_bucket[10m]))
+          ) > 10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.environment }}: 95th percentile above 10s"
+          description: >-
+            Generation is slow by nature, so this is tuned well above normal.
+            Check the model latency panel before assuming the app is at fault.
+          runbook: "docs/runbook.md#slowrequests"
+
+      - alert: ModelCallsFailing
+        expr: |
+          sum by (provider) (rate(notebook_ai_requests_total{outcome="error"}[10m]))
+            /
+          sum by (provider) (rate(notebook_ai_requests_total[10m]))
+            > 0.2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.provider }}: over 20% of model calls failing"
+          description: "Usually a quota or an outage upstream rather than a code change."
+          runbook: "docs/runbook.md#modelcallsfailing"
+
+      - alert: SpendAboveBudget
+        expr: increase(notebook_ai_cost_usd_total[24h]) > 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Estimated model spend above $20 in 24h"
+          description: "An estimate from token counts, not an invoice — but worth looking at."
+          runbook: "docs/runbook.md#spendabovebudget"
+
+  - name: infrastructure
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Postgres is unreachable"
+          runbook: "docs/runbook.md#postgresdown"
+
+      - alert: DiskFillingUp
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/rootfs",fstype!~"tmpfs|overlay"}
+            /
+          node_filesystem_size_bytes{mountpoint="/rootfs",fstype!~"tmpfs|overlay"}
+            < 0.15
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Under 15% disk free"
+          description: "Usually old images or Postgres WAL. See the runbook before deleting anything."
+          runbook: "docs/runbook.md#diskfillingup"
+
+      - alert: ContainerRestartLoop
+        expr: increase(container_start_time_seconds{name=~"notebook-.*"}[15m]) > 3
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.name }} has restarted repeatedly"
+          description: "A crash loop usually means configuration, not load."
+          runbook: "docs/runbook.md#containerrestartloop"

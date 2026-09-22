@@ -1,0 +1,37 @@
+# Routing only — no receiver credentials in version control.
+#
+# Static values throughout: Alertmanager, like Prometheus, does not expand
+# environment variables in its configuration. A ${VAR} here is parsed
+# literally and the whole file fails to load, taking alerting with it.
+# Edit the webhook URL below, or mount a different file per environment.
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: [alertname, environment]
+  # Hold briefly so a deploy that trips three rules at once arrives as one
+  # message rather than three.
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: default
+      repeat_interval: 1h
+
+inhibit_rules:
+  # When the app is down, its error rate and latency are consequences.
+  # Paging for all three says nothing the first alert did not.
+  - source_matchers: [alertname="AppDown"]
+    target_matchers: [severity=~"warning|critical"]
+    equal: [environment]
+
+receivers:
+  - name: default
+    webhook_configs:
+      # Replace with a Slack, Discord or ntfy endpoint. Left as a black hole so
+      # the stack starts cleanly out of the box rather than failing on a
+      # missing credential.
+      - url: http://alertmanager-sink:9099/noop
+        send_resolved: true

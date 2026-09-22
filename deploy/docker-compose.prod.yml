@@ -40,6 +40,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?required}
       STORAGE_DIR: /data/blobs
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     volumes:
       - blobs:/data
     ports:

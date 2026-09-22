@@ -45,6 +45,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
       STORAGE_DIR: /data/blobs
+      # Guards /api/metrics; leave unset locally to scrape without a token.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     volumes:
       # Generated audio lives here, so it survives a rebuild.
       - blobs:/data

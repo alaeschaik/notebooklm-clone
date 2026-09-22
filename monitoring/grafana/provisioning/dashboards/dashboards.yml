@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  # Dashboards come from disk, not from clicking. A dashboard edited in the UI
+  # and never exported is lost the first time the volume is recreated.
+  - name: notebook
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
