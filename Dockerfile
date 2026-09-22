@@ -4,7 +4,7 @@
 # Dependencies. Kept as its own stage so a source-only change reuses the
 # npm install layer instead of reinstalling on every build.
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS deps
+FROM node:26-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -12,7 +12,7 @@ RUN npm ci
 # ---------------------------------------------------------------------------
 # Build.
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS builder
+FROM node:26-bookworm-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -30,7 +30,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Runtime. Only the standalone server, its static assets, and the migrations.
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 WORKDIR /app
 
 # Passed by CI. Without them a running container cannot be traced back to the
