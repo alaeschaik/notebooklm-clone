@@ -180,22 +180,37 @@ jobs:
       packages: read
       security-events: write
     steps:
-      - name: Trivy
+      # Two passes on purpose. The first records everything it finds, including
+      # the low-severity and unfixable issues that are worth seeing but not
+      # worth blocking on. The second is the gate.
+      - name: Scan and report
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
           format: sarif
           output: trivy.sarif
-          severity: HIGH,CRITICAL
-          # Only findings with a fix available. Without this the pipeline goes
-          # permanently red on unfixable base-image CVEs and people stop reading it.
-          ignore-unfixed: true
+          # No exit-code: reporting must not fail, or nothing reaches the tab.
 
       - name: Publish to the Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy.sarif
           category: trivy
+
+      - name: Fail on anything serious and fixable
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
+          format: table
+          severity: HIGH,CRITICAL
+          # Only findings with a fix. Blocking on unfixable base-image CVEs
+          # turns the pipeline permanently red, and a red pipeline nobody can
+          # act on is one nobody reads.
+          ignore-unfixed: true
+          exit-code: "1"
+        env:
+          # The first pass populated it, so this one is a lookup, not a download.
+          TRIVY_SKIP_DB_UPDATE: true
 
   deploy-staging:
     name: Deploy to staging
