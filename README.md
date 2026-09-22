@@ -1,5 +1,7 @@
 # Notebook
 
+[![Pipeline](https://github.com/alaeschaik/notebooklm-clone/actions/workflows/pipeline.yml/badge.svg)](https://github.com/alaeschaik/notebooklm-clone/actions/workflows/pipeline.yml)
+
 A NotebookLM clone: upload sources, ask questions, and get answers where every
 claim links back to the exact sentence that supports it.
 
@@ -92,6 +94,8 @@ a 44-byte header inside the audio, which decodes as noise.
 | Gemini | embeddings (`gemini-embedding-001`) and multi-speaker TTS |
 | Tailwind v4 | token-based design system, light and dark |
 | Docker Compose | two containers, self-hosted, no managed services |
+| GitHub Actions → GHCR | build, scan, deploy to staging, approve, deploy to production |
+| Prometheus + Grafana | metrics, provisioned dashboards, ten alert rules |
 
 Two provider decisions worth noting. Citations and structured outputs are
 mutually exclusive in the API, which partitions the work cleanly: prose output
@@ -129,6 +133,30 @@ npm run e2e     # browser tests (needs a running app)
 npm run lint
 npm run typecheck
 ```
+
+---
+
+## Running it in anger
+
+Beyond `docker compose up`, the repository carries what it takes to operate
+this on a server:
+
+- **Delivery** — one pipeline from commit to production: verify, browser tests,
+  image to GHCR with an SBOM and a provenance attestation, a Trivy scan into the
+  Security tab, deploy to staging, smoke test, then production behind a required
+  approval. Production deploys *the image staging proved*, by immutable `sha-`
+  tag.
+- **Deployment** — `deploy/deploy.sh` rolls out, waits on the health endpoint,
+  and rolls back to the last tag that passed it. Runs on a self-hosted runner,
+  so the server connects out to GitHub and needs no inbound port.
+- **Monitoring** — request rate, errors and latency, plus model tokens and
+  estimated spend; Postgres, container and host exporters; a blackbox probe of
+  the public URL; and alerts that each carry a runbook link.
+- **Hardening** — the runtime container is read-only with all capabilities
+  dropped, runs as a non-root user, and is memory- and CPU-limited.
+
+[docs/devops.md](docs/devops.md) covers setup and the reasoning.
+[docs/runbook.md](docs/runbook.md) is what to do when something pages you.
 
 ---
 

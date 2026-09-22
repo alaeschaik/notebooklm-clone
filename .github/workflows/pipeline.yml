@@ -200,7 +200,10 @@ jobs:
   deploy-staging:
     name: Deploy to staging
     needs: [build, scan]
-    if: github.ref == 'refs/heads/main'
+    # Gated on a repository variable rather than only the branch. Without a
+    # registered self-hosted runner the job would queue forever, so the
+    # pipeline stays green until DEPLOY_ENABLED is set to "true".
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     runs-on: [self-hosted, notebook]
     environment:
       name: staging
@@ -216,6 +219,7 @@ jobs:
   smoke:
     name: Smoke test staging
     needs: [build, deploy-staging]
+    if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -242,7 +246,7 @@ jobs:
   deploy-production:
     name: Deploy to production
     needs: [build, smoke]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     runs-on: [self-hosted, notebook]
     # The environment carries the required reviewer. Production waits here
     # until a human approves, and the approval is recorded against the commit.
