@@ -58,6 +58,14 @@ ENV GIT_REVISION=${GIT_REVISION} \
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
+ # The runtime starts with `node server.js` and never installs anything, so the
+ # bundled package managers are pure attack surface. They also account for
+ # every HIGH finding the image scan reports — tar, ip-address and
+ # brace-expansion ship inside npm, not in this project's dependencies.
+ && rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx \
+           /usr/local/bin/corepack /opt/yarn* \
  && groupadd --system --gid 1001 nodejs \
  && useradd --system --uid 1001 --gid nodejs nextjs
 
