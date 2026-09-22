@@ -1,6 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
+import { recordAiCall } from "@/lib/observability/ai";
 import { EMBEDDING_DIMENSIONS } from "@/lib/db/schema";
+
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("embeddings");
 
 /**
  * Gemini rather than OpenAI: a Gemini key is already needed for audio, and its
@@ -44,11 +49,17 @@ async function embedBatch(
   texts: string[],
   taskType: TaskType,
 ): Promise<(number[] | null)[]> {
-  const response = await getClient().models.embedContent({
-    model: EMBEDDING_MODEL,
-    contents: texts,
-    config: { outputDimensionality: EMBEDDING_DIMENSIONS, taskType },
-  });
+  const response = await recordAiCall(
+    { provider: "gemini", model: EMBEDDING_MODEL, operation: `embed:${taskType}` },
+    () =>
+      getClient().models.embedContent({
+        model: EMBEDDING_MODEL,
+        contents: texts,
+        config: { outputDimensionality: EMBEDDING_DIMENSIONS, taskType },
+      }),
+    // The endpoint reports no usage, so only the call itself is counted.
+    () => undefined,
+  );
 
   const embeddings = response.embeddings ?? [];
   return texts.map((_, index) => embeddings[index]?.values ?? null);
@@ -65,9 +76,7 @@ export async function embedAll(
   if (texts.length === 0) return [];
 
   if (!embeddingsEnabled()) {
-    console.warn(
-      "[embeddings] GEMINI_API_KEY is not set — storing chunks without vectors. Retrieval will use full-text search only.",
-    );
+    log.warn("no API key — storing chunks without vectors, retrieval falls back to full-text");
     return texts.map(() => null);
   }
 
@@ -85,10 +94,7 @@ export async function embedAll(
     } catch (error) {
       // A source without vectors is still readable and citable; a source that
       // failed to ingest is useless. Loud, because ranking quality does drop.
-      console.error(
-        "[embeddings] request failed — storing this batch without vectors; retrieval falls back to full-text",
-        error,
-      );
+      log.error("batch failed — storing it without vectors", { error });
       vectors.push(...batch.map(() => null));
     }
   }

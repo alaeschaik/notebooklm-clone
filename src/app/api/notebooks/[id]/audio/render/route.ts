@@ -8,6 +8,7 @@ import { getDb } from "@/lib/db";
 import { audioOverviews, type AudioSegment } from "@/lib/db/schema";
 import { deleteFile, getFile, putFile } from "@/lib/storage";
 
+import { instrument } from "@/lib/observability/http";
 /**
  * How many times a segment may be re-attempted before it is given up on.
  * Rate limiting is the common failure here and it clears on its own, so a
@@ -21,7 +22,7 @@ const MAX_ATTEMPTS = 6;
  * reports `ready` or `failed`, which keeps every request short regardless of
  * how long the whole overview takes.
  */
-export async function POST(
+async function handlePOST(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/audio/render">,
 ) {
@@ -140,3 +141,5 @@ export async function POST(
     return handleRouteError(error);
   }
 }
+
+export const POST = instrument("/api/notebooks/[id]/audio/render", handlePOST);

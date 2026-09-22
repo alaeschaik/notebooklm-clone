@@ -5,7 +5,8 @@ import { handleRouteError, readJson, requireOwnedNotebook } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { notebooks } from "@/lib/db/schema";
 
-export async function GET(
+import { instrument } from "@/lib/observability/http";
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]">,
 ) {
@@ -17,7 +18,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]">,
 ) {
@@ -42,7 +43,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]">,
 ) {
@@ -56,3 +57,7 @@ export async function DELETE(
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/notebooks/[id]", handleGET);
+export const PATCH = instrument("/api/notebooks/[id]", handlePATCH);
+export const DELETE = instrument("/api/notebooks/[id]", handleDELETE);

@@ -5,6 +5,10 @@ import { getDb } from "@/lib/db";
 import { notebooks, sources } from "@/lib/db/schema";
 import { UnauthorizedError, getVisitorId } from "@/lib/session-server";
 
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("api");
+
 /** An error whose message is safe and useful to show the user. */
 export class ApiError extends Error {
   constructor(
@@ -89,7 +93,7 @@ export function handleRouteError(error: unknown): NextResponse {
     );
   }
 
-  console.error("[api] unhandled error", error);
+  log.error("unhandled error", { error });
   return NextResponse.json(
     { error: "Something went wrong. Please try again." },
     { status: 500 },

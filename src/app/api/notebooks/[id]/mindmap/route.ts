@@ -9,6 +9,11 @@ import { getDb } from "@/lib/db";
 import { mindMaps, type MindMapNode } from "@/lib/db/schema";
 import type { Locale } from "@/lib/i18n/dictionaries";
 
+import { instrument } from "@/lib/observability/http";
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("mindmap");
+
 /**
  * Three levels, declared explicitly rather than recursively: JSON Schema
  * recursion via $ref is supported unevenly, and a hand-rolled depth limit also
@@ -25,7 +30,7 @@ const node = (depth: number): Record<string, unknown> => ({
   additionalProperties: false,
 });
 
-export async function GET(
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/mindmap">,
 ) {
@@ -46,7 +51,7 @@ export async function GET(
   }
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/mindmap">,
 ) {
@@ -87,7 +92,7 @@ async function generate(jobId: string, sourceText: string, locale: Locale) {
       .set({ data: map, status: "ready", error: null })
       .where(eq(mindMaps.id, jobId));
   } catch (error) {
-    console.error("[mindmap] generation failed", error);
+    log.error("generation failed", { jobId, error });
     await db
       .update(mindMaps)
       .set({
@@ -100,3 +105,6 @@ async function generate(jobId: string, sourceText: string, locale: Locale) {
       .where(eq(mindMaps.id, jobId));
   }
 }
+
+export const GET = instrument("/api/notebooks/[id]/mindmap", handleGET);
+export const POST = instrument("/api/notebooks/[id]/mindmap", handlePOST);

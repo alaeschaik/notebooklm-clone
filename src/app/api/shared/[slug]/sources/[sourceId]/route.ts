@@ -5,13 +5,14 @@ import { assertUuid, handleRouteError, notFound } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { notebooks, sources } from "@/lib/db/schema";
 
+import { instrument } from "@/lib/observability/http";
 /**
  * The reader in a shared notebook needs source text, but the owner-scoped
  * source route would reject a visitor who does not own it. This serves the same
  * data gated on the share slug instead — and only for a notebook that is
  * actually shared, since the slug is the entire proof of access.
  */
-export async function GET(
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/shared/[slug]/sources/[sourceId]">,
 ) {
@@ -35,3 +36,5 @@ export async function GET(
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/shared/[slug]/sources/[sourceId]", handleGET);

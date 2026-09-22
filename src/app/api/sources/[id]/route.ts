@@ -5,8 +5,9 @@ import { handleRouteError, requireOwnedSource } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { sources } from "@/lib/db/schema";
 
+import { instrument } from "@/lib/observability/http";
 /** Returns the full text so the reader can highlight a cited range in place. */
-export async function GET(
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/sources/[id]">,
 ) {
@@ -19,7 +20,7 @@ export async function GET(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   ctx: RouteContext<"/api/sources/[id]">,
 ) {
@@ -32,3 +33,6 @@ export async function DELETE(
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/sources/[id]", handleGET);
+export const DELETE = instrument("/api/sources/[id]", handleDELETE);

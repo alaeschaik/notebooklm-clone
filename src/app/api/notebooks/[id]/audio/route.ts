@@ -9,6 +9,11 @@ import { getDb } from "@/lib/db";
 import { audioOverviews, type DialogueTurn } from "@/lib/db/schema";
 import { getLocale } from "@/lib/i18n/server";
 
+import { instrument } from "@/lib/observability/http";
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("audio");
+
 const SCRIPT_SCHEMA = {
   type: "object",
   properties: {
@@ -30,7 +35,7 @@ const SCRIPT_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export async function GET(
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/audio">,
 ) {
@@ -57,7 +62,7 @@ export async function GET(
  * speech synthesis is rate limited and a rate-limited segment should retry on
  * its own rather than take the whole overview down.
  */
-export async function POST(
+async function handlePOST(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/audio">,
 ) {
@@ -105,7 +110,7 @@ export async function POST(
 
       return NextResponse.json({ audio: updated }, { status: 202 });
     } catch (error) {
-      console.error("[audio] script generation failed", error);
+      log.error("script generation failed", { notebookId: notebook.id, error });
       const [failed] = await db
         .update(audioOverviews)
         .set({
@@ -123,3 +128,6 @@ export async function POST(
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/notebooks/[id]/audio", handleGET);
+export const POST = instrument("/api/notebooks/[id]/audio", handlePOST);

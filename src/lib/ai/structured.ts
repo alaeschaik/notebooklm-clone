@@ -3,6 +3,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { sources } from "@/lib/db/schema";
 
+import { recordAiCall } from "@/lib/observability/ai";
+
 import { MODEL, getClaude } from "./claude";
 
 /**
@@ -19,22 +21,34 @@ export async function generateStructured<T>({
   schema,
   effort = "medium",
   maxTokens = 8000,
+  operation = "structured",
 }: {
   system: string;
   prompt: string;
   schema: Record<string, unknown>;
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Labels the cost and token counters, so spend is attributable per feature. */
+  operation?: string;
 }): Promise<T> {
-  const response = await getClaude().beta.messages.create({
-    model: MODEL,
-    betas: [STRUCTURED_BETA],
-    max_tokens: maxTokens,
-    thinking: { type: "adaptive" },
-    output_config: { effort, format: { type: "json_schema", schema } },
-    system,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const response = await recordAiCall(
+    { provider: "anthropic", model: MODEL, operation },
+    () =>
+      getClaude().beta.messages.create({
+        model: MODEL,
+        betas: [STRUCTURED_BETA],
+        max_tokens: maxTokens,
+        thinking: { type: "adaptive" },
+        output_config: { effort, format: { type: "json_schema", schema } },
+        system,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    (result) => ({
+      input: result.usage.input_tokens,
+      output: result.usage.output_tokens,
+      cachedInput: result.usage.cache_read_input_tokens ?? undefined,
+    }),
+  );
 
   const text = response.content
     .filter((block) => block.type === "text")

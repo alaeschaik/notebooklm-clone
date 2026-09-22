@@ -3,12 +3,18 @@ import { desc, eq } from "drizzle-orm";
 
 import { assertUuids, badRequest, handleRouteError, readJson, requireOwnedNotebook } from "@/lib/api";
 import { CitationResolver } from "@/lib/ai/citations";
-import { getClaude, groundedDefaults } from "@/lib/ai/claude";
+import { MODEL, getClaude, groundedDefaults } from "@/lib/ai/claude";
 import { buildContext } from "@/lib/ai/context";
 import { chatSystem } from "@/lib/ai/prompts";
 import { getLocale } from "@/lib/i18n/server";
+import { recordAiUsage } from "@/lib/observability/ai";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, type CitationMarker, type StoredCitation } from "@/lib/db/schema";
+
+import { instrument } from "@/lib/observability/http";
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("chat");
 
 /** Recent turns kept so follow-ups like "and the second one?" resolve. */
 const HISTORY_TURNS = 10;
@@ -24,7 +30,7 @@ function encodeEvent(event: ChatEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/chat">,
 ) {
@@ -131,6 +137,9 @@ export async function POST(
           // its text, so using the running length would put every marker in
           // front of the sentence it supports instead of after it.
           let pending: StoredCitation[] = [];
+          // Streaming splits usage across events: the opening message carries
+          // input tokens, the closing delta carries output tokens.
+          const usage = { input: 0, output: 0, cachedInput: 0 };
 
           const flushCitations = () => {
             for (const citation of pending) {
@@ -141,6 +150,16 @@ export async function POST(
           };
 
           for await (const event of claude) {
+            if (event.type === "message_start") {
+              usage.input = event.message.usage.input_tokens ?? 0;
+              usage.cachedInput =
+                event.message.usage.cache_read_input_tokens ?? 0;
+              continue;
+            }
+            if (event.type === "message_delta") {
+              usage.output = event.usage.output_tokens ?? 0;
+              continue;
+            }
             if (event.type === "content_block_stop") {
               flushCitations();
               continue;
@@ -158,6 +177,11 @@ export async function POST(
 
           // A final block that never reported a stop must not lose its markers.
           flushCitations();
+
+          recordAiUsage(
+            { provider: "anthropic", model: MODEL, operation: "chat" },
+            usage,
+          );
 
           const [saved] = await db
             .insert(messages)
@@ -181,7 +205,7 @@ export async function POST(
           // A disconnect surfaces here as an abort. That is the user leaving,
           // not a failure, and logging it as one buries the real ones.
           if (!disconnected) {
-            console.error("[chat] stream failed", error);
+            log.error("stream failed", { notebookId: notebook.id, error });
             // The response is already a 200 by this point, so the error has to
             // travel in-band for the client to be able to show it.
             send({
@@ -216,3 +240,5 @@ export async function POST(
     return handleRouteError(error);
   }
 }
+
+export const POST = instrument("/api/notebooks/[id]/chat", handlePOST);

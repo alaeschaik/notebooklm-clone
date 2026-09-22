@@ -5,7 +5,8 @@ import { handleRouteError, requireOwnedNotebook } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { messages } from "@/lib/db/schema";
 
-export async function GET(
+import { instrument } from "@/lib/observability/http";
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/messages">,
 ) {
@@ -26,7 +27,7 @@ export async function GET(
 }
 
 /** Clears the conversation without touching sources or studio output. */
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/messages">,
 ) {
@@ -39,3 +40,6 @@ export async function DELETE(
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/notebooks/[id]/messages", handleGET);
+export const DELETE = instrument("/api/notebooks/[id]/messages", handleDELETE);

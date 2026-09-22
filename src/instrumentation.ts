@@ -1,3 +1,7 @@
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("migrate");
+
 /**
  * Applies pending migrations on boot, so deploying is `docker compose up` and
  * the schema ships with the code expecting it. Set RUN_MIGRATIONS_ON_BOOT=false
@@ -16,10 +20,10 @@ export async function register() {
 
   try {
     await migrate(getDb(), { migrationsFolder: "./drizzle" });
-    console.log("[migrate] database schema is up to date");
+    log.info("database schema is up to date");
   } catch (error) {
     // Fatal on purpose: a schema the code does not match fails far from here.
-    console.error("[migrate] failed to apply migrations", error);
+    log.error("failed to apply migrations", { error });
     await getPool().end().catch(() => {});
     throw error;
   }

@@ -7,12 +7,13 @@ import { handleRouteError, requireOwnedNotebook } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { notebooks } from "@/lib/db/schema";
 
+import { instrument } from "@/lib/observability/http";
 /**
  * Sharing mints an unguessable slug rather than exposing the notebook id.
  * Reusing the id would mean revoking a share and re-sharing hands out the same
  * address, so an old link would silently come back to life.
  */
-export async function POST(
+async function handlePOST(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/share">,
 ) {
@@ -33,7 +34,7 @@ export async function POST(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/share">,
 ) {
@@ -51,3 +52,6 @@ export async function DELETE(
     return handleRouteError(error);
   }
 }
+
+export const POST = instrument("/api/notebooks/[id]/share", handlePOST);
+export const DELETE = instrument("/api/notebooks/[id]/share", handleDELETE);

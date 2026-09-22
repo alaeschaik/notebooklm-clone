@@ -9,13 +9,14 @@ import { notebooks, sources, type sourceKind } from "@/lib/db/schema";
 import { ingestSource, type IngestInput } from "@/lib/ingest/pipeline";
 import { parseVideoId } from "@/lib/ingest/youtube";
 
+import { instrument } from "@/lib/observability/http";
 /** Ingestion parses, chunks and embeds in one request; give it room. */
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 type Kind = (typeof sourceKind.enumValues)[number];
 
-export async function GET(
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/sources">,
 ) {
@@ -112,7 +113,7 @@ async function readInput(
     : { kind: "web", title: url, url, input: { kind: "web", url } };
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/sources">,
 ) {
@@ -183,3 +184,6 @@ const UNTITLED = new Set([
   "Unbenanntes Notizbuch",
   "",
 ]);
+
+export const GET = instrument("/api/notebooks/[id]/sources", handleGET);
+export const POST = instrument("/api/notebooks/[id]/sources", handlePOST);

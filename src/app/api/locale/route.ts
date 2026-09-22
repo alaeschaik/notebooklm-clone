@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 
 import { LOCALE_COOKIE, isLocale } from "@/lib/i18n/dictionaries";
 
+import { instrument } from "@/lib/observability/http";
 /**
  * Language lives in a cookie rather than the URL. The alternative — locale
  * path segments — would mean every notebook has two addresses, which breaks
  * the share links this app hands out.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const { locale } = (await request.json().catch(() => ({}))) as {
     locale?: unknown;
   };
@@ -23,3 +24,5 @@ export async function POST(request: Request) {
   });
   return response;
 }
+
+export const POST = instrument("/api/locale", handlePOST);

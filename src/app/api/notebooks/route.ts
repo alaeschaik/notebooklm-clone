@@ -6,7 +6,8 @@ import { getDb } from "@/lib/db";
 import { notebooks } from "@/lib/db/schema";
 import { requireVisitorId } from "@/lib/session-server";
 
-export async function GET() {
+import { instrument } from "@/lib/observability/http";
+async function handleGET() {
   try {
     const visitorId = await requireVisitorId();
     const rows = await getDb()
@@ -21,7 +22,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     const visitorId = await requireVisitorId();
     const body = await readJson<{ title?: string; emoji?: string }>(request);
@@ -40,3 +41,6 @@ export async function POST(request: Request) {
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/notebooks", handleGET);
+export const POST = instrument("/api/notebooks", handlePOST);

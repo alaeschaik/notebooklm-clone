@@ -5,6 +5,7 @@ import { languageInstruction } from "@/lib/ai/prompts";
 import { generateStructured, loadSourceText } from "@/lib/ai/structured";
 import { getLocale } from "@/lib/i18n/server";
 
+import { instrument } from "@/lib/observability/http";
 const SCHEMA = {
   type: "object",
   properties: {
@@ -24,7 +25,7 @@ Prefer the questions a curious reader would actually ask over the ones that mere
  * Generated on demand rather than stored: the useful questions change as
  * sources are added or deselected, and a cached set goes stale immediately.
  */
-export async function POST(
+async function handlePOST(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/suggestions">,
 ) {
@@ -53,3 +54,5 @@ export async function POST(
     return handleRouteError(error);
   }
 }
+
+export const POST = instrument("/api/notebooks/[id]/suggestions", handlePOST);

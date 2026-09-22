@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { embedAll } from "@/lib/ai/embeddings";
 import { labelForOffset } from "@/lib/ai/citations";
+import { metrics } from "@/lib/observability/metrics";
 import { getDb } from "@/lib/db";
 import { chunks, sources } from "@/lib/db/schema";
 
@@ -11,6 +12,10 @@ import { extractPdf } from "./pdf";
 import { extractPlainText } from "./text";
 import { extractWeb } from "./web";
 import { extractYouTube } from "./youtube";
+
+import { logger } from "@/lib/observability/logger";
+
+const log = logger("ingest");
 
 /** Inserted in batches so a large document does not build one enormous query. */
 const INSERT_BATCH = 200;
@@ -48,6 +53,9 @@ export async function ingestSource(
   input: IngestInput,
 ): Promise<void> {
   const db = getDb();
+  const started = process.hrtime.bigint();
+  const elapsed = () => Number(process.hrtime.bigint() - started) / 1e9;
+
   await db
     .update(sources)
     .set({ status: "processing", error: null })
@@ -101,6 +109,15 @@ export async function ingestSource(
       .update(sources)
       .set({ status: "ready", error: null })
       .where(eq(sources.id, sourceId));
+
+    metrics.ingestDuration.observe({ kind: input.kind, outcome: "ready" }, elapsed());
+    log.info("source ready", {
+      sourceId,
+      kind: input.kind,
+      chars: document.text.length,
+      chunks: spans.length,
+      seconds: Number(elapsed().toFixed(2)),
+    });
   } catch (error) {
     const message =
       error instanceof IngestError
@@ -108,12 +125,14 @@ export async function ingestSource(
         : "Something went wrong while processing this source. Please try again.";
 
     if (!(error instanceof IngestError)) {
-      console.error(`[ingest] source ${sourceId} failed`, error);
+      log.error("source failed", { sourceId, error });
     }
 
     await db
       .update(sources)
       .set({ status: "failed", error: message })
       .where(eq(sources.id, sourceId));
+
+    metrics.ingestDuration.observe({ kind: input.kind, outcome: "failed" }, elapsed());
   }
 }

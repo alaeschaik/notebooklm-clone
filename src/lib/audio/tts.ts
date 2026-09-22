@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
+import { recordAiCall } from "@/lib/observability/ai";
 import type { DialogueTurn } from "@/lib/db/schema";
 
 import { HOSTS, segmentPrompt } from "./script";
@@ -99,7 +100,10 @@ export async function renderSegment(
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const response = await getClient().models.generateContent(request);
+      const response = await recordAiCall(
+        { provider: "gemini", model: TTS_MODEL, operation: "tts" },
+        () => getClient().models.generateContent(request),
+      );
       const part = response.candidates?.[0]?.content?.parts?.[0];
       const data = part?.inlineData?.data;
 

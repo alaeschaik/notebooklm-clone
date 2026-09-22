@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readStoredFile } from "@/lib/storage";
 
+import { instrument } from "@/lib/observability/http";
 const CONTENT_TYPES: Record<string, string> = {
   wav: "audio/wav",
   mp3: "audio/mpeg",
@@ -12,7 +13,7 @@ const CONTENT_TYPES: Record<string, string> = {
  * directory. Traversal is rejected by the storage layer, which is the only
  * place that turns a key into a path.
  */
-export async function GET(
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/files/[...key]">,
 ) {
@@ -32,3 +33,5 @@ export async function GET(
     },
   });
 }
+
+export const GET = instrument("/api/files/[...key]", handleGET);

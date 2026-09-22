@@ -5,7 +5,8 @@ import { badRequest, handleRouteError, readJson, requireOwnedNotebook } from "@/
 import { getDb } from "@/lib/db";
 import { notes, type CitationMarker, type StoredCitation } from "@/lib/db/schema";
 
-export async function GET(
+import { instrument } from "@/lib/observability/http";
+async function handleGET(
   _request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/notes">,
 ) {
@@ -25,7 +26,7 @@ export async function GET(
   }
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/notes">,
 ) {
@@ -60,7 +61,7 @@ export async function POST(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   request: Request,
   ctx: RouteContext<"/api/notebooks/[id]/notes">,
 ) {
@@ -86,3 +87,7 @@ export async function DELETE(
     return handleRouteError(error);
   }
 }
+
+export const GET = instrument("/api/notebooks/[id]/notes", handleGET);
+export const POST = instrument("/api/notebooks/[id]/notes", handlePOST);
+export const DELETE = instrument("/api/notebooks/[id]/notes", handleDELETE);
