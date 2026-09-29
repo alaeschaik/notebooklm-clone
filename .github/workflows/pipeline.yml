@@ -230,6 +230,10 @@ jobs:
         env:
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          # Outside the checkout on purpose: actions/checkout cleans the
+          # workspace, which would delete the environment's .env and the
+          # last-good tag the rollback depends on.
+          DEPLOY_STATE_DIR: /opt/notebook/staging
 
   smoke:
     name: Smoke test staging
@@ -277,3 +281,7 @@ jobs:
         env:
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           HEALTH_URL: ${{ vars.PRODUCTION_HEALTH_URL }}
+          # Outside the checkout on purpose: actions/checkout cleans the
+          # workspace, which would delete the environment's .env and the
+          # last-good tag the rollback depends on.
+          DEPLOY_STATE_DIR: /opt/notebook/production

@@ -29,6 +29,10 @@ services:
       # restarts the app containers alongside it.
       - /var/run/docker.sock:/var/run/docker.sock
       - runner-work:/_work
+      # Per-environment .env and last-good tag. They live here rather than in
+      # the checkout because actions/checkout cleans the workspace on every
+      # run, which would take the secrets and the rollback target with it.
+      - /opt/notebook:/opt/notebook
     security_opt: ["no-new-privileges:true"]
     logging:
       driver: json-file

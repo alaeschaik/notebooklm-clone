@@ -69,16 +69,24 @@ The label `notebook` is what makes the deploy jobs land on this machine.
 
 ### 2 · Create the environments
 
-One directory per environment, each with its own `.env` and its own port:
+One directory per environment on the server, each with its own `.env` and its
+own port. These live outside the repository checkout — `actions/checkout`
+cleans the workspace on every run and would delete them:
 
 ```
-deploy/staging/.env       APP_PORT=3000
-deploy/production/.env    APP_PORT=3001
+/opt/notebook/staging/.env       APP_PORT=3000
+/opt/notebook/production/.env    APP_PORT=3001
 ```
 
-Copy `deploy/.env.example` into each and fill it in. Different database
-passwords and a different `SESSION_SECRET` per environment — sharing them means
-staging traffic can read production sessions.
+```bash
+sudo mkdir -p /opt/notebook/{staging,production}
+sudo cp deploy/.env.example /opt/notebook/staging/.env
+sudo cp deploy/.env.example /opt/notebook/production/.env
+```
+
+Fill each one in. Different database passwords and a different
+`SESSION_SECRET` per environment — sharing them means staging traffic can read
+production sessions.
 
 ### 3 · Configure GitHub
 
@@ -95,6 +103,10 @@ pause before production, and it is recorded against the commit.
 | `STAGING_HEALTH_URL` | `https://staging.notebook.example.com/api/health` |
 | `PRODUCTION_URL` | `https://notebook.example.com` |
 | `PRODUCTION_HEALTH_URL` | `https://notebook.example.com/api/health` |
+
+The health URLs are fetched by `deploy.sh` from inside the runner container,
+where `localhost` is the container itself. Use the public hostnames, which
+also proves the reverse proxy is routing correctly.
 
 **Secrets:** `ANTHROPIC_API_KEY` and `GEMINI_API_KEY`, for the browser tests.
 
