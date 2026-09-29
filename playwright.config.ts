@@ -1,6 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+/**
+ * An explicit E2E_BASE_URL means we are testing something already deployed —
+ * the smoke run against staging. Nothing should be built or started locally
+ * then; the point is to exercise the instance the pipeline just rolled out.
+ */
+const DEPLOYED_TARGET = process.env.E2E_BASE_URL;
+const BASE_URL = DEPLOYED_TARGET ?? "http://localhost:3000";
 
 /**
  * These are smoke tests, not a second copy of the unit suite. They exist to
@@ -22,13 +28,15 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
-  // Starts a server only if nothing is already serving BASE_URL, so a local
-  // run against `npm run dev` or a running container just works. CI has no
-  // server up, so it starts the production build these tests should exercise.
-  webServer: {
-    command: process.env.CI ? "npm run start" : "npm run dev",
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  // Locally this reuses whatever already serves BASE_URL, and in CI it starts
+  // the production build the tests should exercise. Against a deployed target
+  // there is nothing to start.
+  webServer: DEPLOYED_TARGET
+    ? undefined
+    : {
+        command: process.env.CI ? "npm run start" : "npm run dev",
+        url: BASE_URL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 180_000,
+      },
 });
