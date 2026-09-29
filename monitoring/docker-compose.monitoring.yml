@@ -29,8 +29,12 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - ./prometheus/metrics-token:/etc/prometheus/metrics-token:ro
+      - ./prometheus/metrics-token.staging:/etc/prometheus/metrics-token.staging:ro
+      - ./prometheus/metrics-token.production:/etc/prometheus/metrics-token.production:ro
       - prometheus-data:/prometheus
+    # Runs as the user that owns the token files, so they can stay 0600
+    # instead of being widened to let the default `nobody` read them.
+    user: "${MONITORING_UID:-65534}:${MONITORING_GID:-65534}"
     ports: ["${PROMETHEUS_PORT:-9090}:9090"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     logging: *logging

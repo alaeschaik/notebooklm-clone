@@ -14,3 +14,8 @@ GRAFANA_ROOT_URL=http://localhost:3300
 # `docker info --format '{{.DockerRootDir}}'` prints it. Snap packages put it
 # outside the usual /var/lib/docker.
 DOCKER_ROOT=/var/snap/docker/common/var-lib-docker
+
+# Prometheus runs as this user so it can read the 0600 scrape-credential files
+# that up.sh writes. Must match the account that runs up.sh (`id -u`).
+MONITORING_UID=1000
+MONITORING_GID=1000
