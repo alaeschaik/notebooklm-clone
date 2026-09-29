@@ -153,8 +153,16 @@ HEALTH_URL=http://localhost:3011/api/health \
 
 It decrypts that environment's secrets into its own process environment, pulls
 the tag, starts the stack, and waits up to 120 seconds for `/api/health` to
-report `ok`. If that never happens it prints the last 60 log lines and rolls
-back to the tag recorded in `/opt/notebook/<env>/last-good-tag`.
+report `ok` **and to name the commit the tag promises**. If that never happens
+it prints the last 60 log lines and rolls back to the tag recorded in
+`/opt/notebook/<env>/last-good-tag`.
+
+The revision half of that check is not decoration. The outgoing container keeps
+answering on the port during a swap, so a gate that only looks for
+`"status":"ok"` can pass on the strength of the version being replaced — and
+then record a broken release as known-good, destroying the rollback target at
+the moment it is needed. That is exactly what happened the first time the
+rollback path was exercised.
 
 It refuses to guess when there is no known-good tag, leaving the new version
 running and failing loudly instead — a deliberate choice, because rolling back
@@ -164,6 +172,35 @@ to an unknown state is worse than stopping.
 expects it deployed together, and it assumes a single instance. Set
 `RUN_MIGRATIONS_ON_BOOT=false` and run them separately the moment that stops
 being true.
+
+---
+
+## Two things this host forced
+
+Both were found by deploying, not by reading, and both are the kind of thing
+that only a real rollout surfaces.
+
+**`no-new-privileges` is unusable here.** The first deployment failed with
+Postgres refusing to start and every `exec` in the container returning
+`operation not permitted`. It is not image-specific and not AppArmor:
+
+```
+$ docker run --rm --security-opt no-new-privileges:true \
+    pgvector/pgvector:pg17 postgres --version
+exec /usr/local/bin/docker-entrypoint.sh: operation not permitted
+```
+
+Docker 29.8.0 on kernel 6.8.0-142, with or without `apparmor=unconfined`, and
+for the application image too. The flag is therefore absent from both compose
+files. What it was guarding against is handled where it can be: the runtime
+image clears every setuid and setgid bit the Debian base ships, so there are no
+escalation primitives left to forbid the use of. Postgres keeps `cap_drop: ALL`
+plus the five capabilities its entrypoint genuinely needs.
+
+**cAdvisor needs to be told where Docker lives.** Docker is installed from snap
+here, so its state is under `/var/snap/docker/common/var-lib-docker` and the
+usual bind mount fails. `DOCKER_ROOT` in `monitoring/env` carries the value that
+`docker info --format '{{.DockerRootDir}}'` prints.
 
 ---
 
