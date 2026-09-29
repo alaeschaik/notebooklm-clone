@@ -29,6 +29,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Cheap and first: a secret committed in the clear is the one mistake
+      # that cannot be undone by a later commit.
+      - name: Secrets are encrypted
+        run: |
+          status=0
+          for f in $(git ls-files '*secrets.env'); do
+            if grep -q 'ENC\[AES256_GCM' "$f"; then
+              echo "ok        $f"
+            else
+              echo "PLAINTEXT $f"; status=1
+            fi
+          done
+          exit $status
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
