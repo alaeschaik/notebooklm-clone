@@ -1,0 +1,11 @@
+# Non-secret monitoring configuration. Confidential values live in
+# monitoring/secrets.env, encrypted.
+#
+# App targets and the probed public URL are in prometheus/prometheus.yml, not
+# here — Prometheus does not expand environment variables in its config.
+
+PROMETHEUS_PORT=9090
+ALERTMANAGER_PORT=9093
+GRAFANA_PORT=3300
+
+GRAFANA_ROOT_URL=http://localhost:3300

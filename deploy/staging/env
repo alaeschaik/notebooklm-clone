@@ -1,0 +1,17 @@
+# Staging configuration. Plain text on purpose: everything here is safe to
+# read, so a change to it shows up as a reviewable diff. Confidential values
+# live in secrets.env next to this file.
+
+# 3000-3003 are taken by other services on this host.
+APP_PORT=3010
+
+LOG_LEVEL=debug
+
+POSTGRES_USER=notebook
+POSTGRES_DB=notebook
+
+# Staging shares the box with production and everything else, so it gets the
+# smaller half.
+APP_MEMORY_LIMIT=768m
+APP_CPU_LIMIT=1.0
+POSTGRES_MEMORY_LIMIT=512m
