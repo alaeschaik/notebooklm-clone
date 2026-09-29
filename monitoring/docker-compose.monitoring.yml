@@ -80,7 +80,9 @@ services:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
+      # Snap installs Docker outside /var/lib/docker, so the root is a
+      # variable; DOCKER_ROOT in monitoring/env carries the host's value.
+      - ${DOCKER_ROOT:-/var/lib/docker}:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     devices: ["/dev/kmsg:/dev/kmsg"]
     logging: *logging

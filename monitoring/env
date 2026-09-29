@@ -9,3 +9,8 @@ ALERTMANAGER_PORT=9093
 GRAFANA_PORT=3300
 
 GRAFANA_ROOT_URL=http://localhost:3300
+
+# Where the Docker daemon keeps its state, mounted read-only by cAdvisor.
+# `docker info --format '{{.DockerRootDir}}'` prints it. Snap packages put it
+# outside the usual /var/lib/docker.
+DOCKER_ROOT=/var/snap/docker/common/var-lib-docker
