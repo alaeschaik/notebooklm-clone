@@ -85,6 +85,11 @@ HTTP the browser discards it and every request looks like a new visitor.
 
 ### Nginx Proxy Manager
 
+> This section covers the single-stack setup above. For the pipeline-managed
+> deployment there are two stacks on one host — staging and production, on the
+> ports in `deploy/<env>/env` — and each gets its own proxy host with the same
+> settings. See [docs/devops.md](docs/devops.md).
+
 **1. Put NPM and the app on the same Docker network.** Then NPM can reach the
 container by name and the app needs no published port at all.
 
