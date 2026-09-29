@@ -6,6 +6,14 @@
 #   ./deploy/deploy.sh staging sha-1a2b3c4
 #
 # Run by the pipeline on the self-hosted runner, and safe to run by hand.
+#
+# Configuration comes from two files per environment, both in the repository:
+#
+#   deploy/<env>/env           plain text, reviewable in a diff
+#   deploy/<env>/secrets.env   encrypted with SOPS, only the server can read it
+#
+# Secrets are decrypted into this process's environment and never written to
+# disk. Compose interpolates them from there.
 set -euo pipefail
 
 ENVIRONMENT="${1:?usage: deploy.sh <staging|production> <image-tag>}"
@@ -21,23 +29,46 @@ case "$ENVIRONMENT" in
 esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="${DEPLOY_STATE_DIR:-$ROOT/$ENVIRONMENT}"
 COMPOSE_FILE="$ROOT/docker-compose.prod.yml"
-ENV_FILE="$STATE_DIR/.env"
-# The tag that was last confirmed healthy — the thing we roll back to.
+CONFIG_FILE="$ROOT/$ENVIRONMENT/env"
+SECRETS_FILE="$ROOT/$ENVIRONMENT/secrets.env"
+
+# State that has to outlive a job: actions/checkout cleans the workspace, so
+# the last-good tag cannot live next to the code.
+STATE_DIR="${DEPLOY_STATE_DIR:-/opt/notebook/$ENVIRONMENT}"
 LAST_GOOD="$STATE_DIR/last-good-tag"
 
-[ -f "$ENV_FILE" ] || { echo "missing env file: $ENV_FILE" >&2; exit 1; }
+# The age identity that decrypts secrets.env. Present only on this server.
+export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-/opt/notebook/keys/age.key}"
+
+log() { printf '%s  %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+die() { echo "$*" >&2; exit 1; }
+
+[ -f "$CONFIG_FILE" ]  || die "missing config: $CONFIG_FILE"
+[ -f "$SECRETS_FILE" ] || die "missing secrets: $SECRETS_FILE"
+[ -d "$STATE_DIR" ]    || die "missing state directory: $STATE_DIR"
+command -v sops >/dev/null || die "sops is not installed"
+[ -r "$SOPS_AGE_KEY_FILE" ] || die "cannot read age key: $SOPS_AGE_KEY_FILE"
+
+# Reads KEY=value lines into the environment. Split on the first '=' only, and
+# never expand the value — secrets legitimately contain $, spaces and '='.
+load_env() {
+  local key value
+  while IFS='=' read -r key value; do
+    case "$key" in ''|'#'*) continue ;; esac
+    export "$key=$value"
+  done
+}
+
+load_env < "$CONFIG_FILE"
+load_env < <(sops --decrypt --output-type dotenv "$SECRETS_FILE")
 
 compose() {
   docker compose \
     --project-name "notebook-$ENVIRONMENT" \
     --file "$COMPOSE_FILE" \
-    --env-file "$ENV_FILE" \
     "$@"
 }
-
-log() { printf '%s  %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 
 # Waits for the app to report healthy. Both the container and the endpoint have
 # to agree: a process can accept connections while unable to reach Postgres.

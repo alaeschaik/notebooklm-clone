@@ -1,0 +1,19 @@
+# Which keys can decrypt which secrets.
+#
+# Two recipients: the deployment server, whose identity lives in
+# /opt/notebook/keys/age.key and never leaves it, and the operator's machine,
+# so secrets can be rotated without shell access to the server.
+#
+# `encrypted_regex` keeps the variable names in the clear and encrypts only the
+# values — that is what makes a rotation a reviewable diff.
+
+keys:
+  - &server age196m2xxvunqdpvcmnmllavjqsymyvjl8m5lgf3kqc2lhmzt426dxqzvchtj
+  - &operator age1qhze9efk04dy5gnr97ch9v52lx8dtrm9f0dleyl9ckzc407yyu0s9nycag
+
+creation_rules:
+  - path_regex: (deploy/(staging|production)|monitoring)/secrets\.env$
+    key_groups:
+      - age:
+          - *server
+          - *operator
