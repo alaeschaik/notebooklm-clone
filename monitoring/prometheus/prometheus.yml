@@ -24,15 +24,26 @@ scrape_configs:
   # The application. Reached over the host gateway rather than by container
   # name, so this stack watches both environments without joining either app's
   # compose network.
-  - job_name: notebook-app
+  #
+  # One job per environment, because each has its own METRICS_TOKEN and a
+  # scrape config carries a single credential. Alert rules match on
+  # job=~"notebook-app.*".
+  - job_name: notebook-app-staging
     metrics_path: /api/metrics
     authorization:
       type: Bearer
-      credentials_file: /etc/prometheus/metrics-token
+      credentials_file: /etc/prometheus/metrics-token.staging
     static_configs:
-      - targets: ["host.docker.internal:3000"]
+      - targets: ["host.docker.internal:3010"]
         labels: { environment: staging }
-      - targets: ["host.docker.internal:3001"]
+
+  - job_name: notebook-app-production
+    metrics_path: /api/metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics-token.production
+    static_configs:
+      - targets: ["host.docker.internal:3011"]
         labels: { environment: production }
 
   - job_name: postgres
@@ -56,7 +67,8 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          - http://host.docker.internal:3000/api/health
+          - https://notebook-staging.sheikhs.at/api/health
+          - https://notebook.sheikhs.at/api/health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

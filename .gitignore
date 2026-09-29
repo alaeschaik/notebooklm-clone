@@ -55,7 +55,7 @@ next-env.d.ts
 /CLAUDE.md
 
 # Scrape credential, written per environment
-/monitoring/prometheus/metrics-token
+/monitoring/prometheus/metrics-token.*
 
 # Decrypted copies of the SOPS files, in case one is ever written out by hand.
 # The encrypted originals are tracked; a *.dec.* file never should be.

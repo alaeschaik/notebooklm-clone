@@ -4,7 +4,7 @@ groups:
   - name: availability
     rules:
       - alert: AppDown
-        expr: up{job="notebook-app"} == 0
+        expr: up{job=~"notebook-app.*"} == 0
         for: 2m
         labels: { severity: critical }
         annotations:

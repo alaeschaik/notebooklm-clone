@@ -33,7 +33,6 @@ services:
       - prometheus-data:/prometheus
     ports: ["${PROMETHEUS_PORT:-9090}:9090"]
     extra_hosts: ["host.docker.internal:host-gateway"]
-    security_opt: ["no-new-privileges:true"]
     logging: *logging
 
   alertmanager:
@@ -43,7 +42,6 @@ services:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
     ports: ["${ALERTMANAGER_PORT:-9093}:9093"]
-    security_opt: ["no-new-privileges:true"]
     logging: *logging
 
   grafana:
@@ -60,7 +58,6 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports: ["${GRAFANA_PORT:-3300}:3000"]
-    security_opt: ["no-new-privileges:true"]
     logging: *logging
 
   postgres-exporter:
@@ -69,7 +66,10 @@ services:
     environment:
       DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:?required}
     extra_hosts: ["host.docker.internal:host-gateway"]
-    security_opt: ["no-new-privileges:true"]
+    # Production's Postgres publishes no port, so the only way in is its own
+    # compose network. Joining it read-only here is narrower than exposing the
+    # database on the host.
+    networks: [default, production]
     logging: *logging
 
   cadvisor:
@@ -93,7 +93,6 @@ services:
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
     volumes:
       - /:/rootfs:ro
-    security_opt: ["no-new-privileges:true"]
     logging: *logging
 
   blackbox-exporter:
@@ -103,8 +102,13 @@ services:
       - ./blackbox/blackbox.yml:/config/blackbox.yml:ro
     command: ["--config.file=/config/blackbox.yml"]
     extra_hosts: ["host.docker.internal:host-gateway"]
-    security_opt: ["no-new-privileges:true"]
     logging: *logging
+
+networks:
+  default:
+  production:
+    external: true
+    name: notebook-production_default
 
 volumes:
   prometheus-data:

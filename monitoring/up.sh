@@ -22,10 +22,12 @@ load_env() {
 load_env < "$ROOT/env"
 load_env < <(sops --decrypt --output-type dotenv "$ROOT/secrets.env")
 
-# Prometheus reads the scrape credential from a file, so this one secret has to
-# exist on disk. Written 0600 and gitignored; it is the single exception.
+# Prometheus reads scrape credentials from files, so these are the one place a
+# secret has to exist on disk. Written 0600 and gitignored. One per
+# environment, because each app has its own token.
 umask 077
-printf '%s' "$METRICS_TOKEN" > "$ROOT/prometheus/metrics-token"
+printf '%s' "$METRICS_TOKEN_STAGING"    > "$ROOT/prometheus/metrics-token.staging"
+printf '%s' "$METRICS_TOKEN_PRODUCTION" > "$ROOT/prometheus/metrics-token.production"
 
 exec docker compose \
   --project-name notebook-monitoring \
