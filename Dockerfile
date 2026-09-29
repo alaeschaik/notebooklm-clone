@@ -67,7 +67,13 @@ RUN apt-get update \
            /usr/local/bin/npm /usr/local/bin/npx \
            /usr/local/bin/corepack /opt/yarn* \
  && groupadd --system --gid 1001 nodejs \
- && useradd --system --uid 1001 --gid nodejs nextjs
+ && useradd --system --uid 1001 --gid nodejs nextjs \
+ # Nothing here ever needs to change user or mount anything, so every setuid
+ # and setgid binary the base image ships — su, mount, passwd, chsh — is a
+ # privilege-escalation primitive with no purpose. Stripping the bits is what
+ # `no-new-privileges` was meant to guard against, and unlike that flag it
+ # works on every host. See docs/devops.md.
+ && find / -xdev -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || true
 
 # `standalone` carries its own minimal node_modules; static assets are not
 # included in it and have to be copied alongside.

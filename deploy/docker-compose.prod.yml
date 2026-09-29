@@ -20,7 +20,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-    security_opt: ["no-new-privileges:true"]
+    # no-new-privileges is deliberately absent: on Docker 29.8.0 it makes every
+    # exec in the container fail with EPERM, whatever the image. cap_drop and
+    # the private network are what confine this service. docs/devops.md has the
+    # reproduction.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     deploy:
       resources:
         limits: { memory: "${POSTGRES_MEMORY_LIMIT:-1g}" }
@@ -54,7 +59,6 @@ services:
       - /tmp
       - /app/.next/cache
     cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
     deploy:
       resources:
         limits:
