@@ -70,17 +70,33 @@ compose() {
     "$@"
 }
 
-# Waits for the app to report healthy. Both the container and the endpoint have
-# to agree: a process can accept connections while unable to reach Postgres.
+# Waits for the app to report healthy *and* to be the version we just rolled
+# out. Three things have to agree, and each has been wrong in practice:
+# the process must accept connections, it must reach Postgres, and it must be
+# the new container rather than the old one still answering on the port during
+# the swap. Without the revision check a deploy can be declared healthy on the
+# strength of the version it was supposed to replace.
 await_health() {
-  local deadline=$((SECONDS + HEALTH_TIMEOUT))
+  local want="$1" deadline=$((SECONDS + HEALTH_TIMEOUT)) body
   while (( SECONDS < deadline )); do
-    if curl -fsS --max-time 5 "$HEALTH_URL" | grep -q '"status":"ok"'; then
-      return 0
+    body="$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null || true)"
+    if [[ "$body" == *'"status":"ok"'* ]]; then
+      # Tags are sha-<short>; /api/health reports the full commit.
+      if [ -z "$want" ] || [[ "$body" == *"\"revision\":\"$want"* ]]; then
+        return 0
+      fi
     fi
     sleep 3
   done
   return 1
+}
+
+# The commit a tag promises to be running, empty for tags that carry no sha.
+revision_of() {
+  case "$1" in
+    sha-*) printf '%s' "${1#sha-}" ;;
+    *)     printf '' ;;
+  esac
 }
 
 roll_to() {
@@ -95,7 +111,7 @@ PREVIOUS="$(cat "$LAST_GOOD" 2>/dev/null || true)"
 
 roll_to "$TAG"
 
-if await_health; then
+if await_health "$(revision_of "$TAG")"; then
   echo "$TAG" > "$LAST_GOOD"
   log "healthy — recorded $TAG as last known good"
   # Old images accumulate fast on a small server.
@@ -116,7 +132,7 @@ fi
 log "rolling back to $PREVIOUS"
 roll_to "$PREVIOUS"
 
-if await_health; then
+if await_health "$(revision_of "$PREVIOUS")"; then
   log "rollback to $PREVIOUS healthy"
 else
   log "rollback to $PREVIOUS ALSO unhealthy — environment is down"
