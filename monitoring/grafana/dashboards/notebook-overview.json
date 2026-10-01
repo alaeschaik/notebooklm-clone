@@ -43,7 +43,7 @@
       },
       "targets": [
         {
-          "expr": "min(up{job=\"notebook-app\"})",
+          "expr": "min(up{job=~\"notebook-app.*\"})",
           "legendFormat": "up",
           "refId": "A"
         }
@@ -129,7 +129,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(notebook_http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(notebook_http_requests_total[5m])), 0.001)",
+          "expr": "(sum(rate(notebook_http_requests_total{status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(notebook_http_requests_total[5m])), 0.001)",
           "legendFormat": "errors",
           "refId": "A"
         }
@@ -252,8 +252,8 @@
       },
       "targets": [
         {
-          "expr": "count by (environment) (up{job=\"notebook-app\"} == 1)",
-          "legendFormat": "{{environment}}",
+          "expr": "notebook_build_info",
+          "legendFormat": "{{environment}} {{revision}}",
           "refId": "A"
         }
       ],

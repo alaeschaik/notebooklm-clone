@@ -1,5 +1,6 @@
 import {
   Counter,
+  Gauge,
   Histogram,
   Registry,
   collectDefaultMetrics,
@@ -37,6 +38,7 @@ type Metrics = {
   aiCost: Counter<"provider" | "model" | "operation">;
   aiDuration: Histogram<"provider" | "model" | "operation">;
   ingestDuration: Histogram<"kind" | "outcome">;
+  buildInfo: Gauge<"revision">;
 };
 
 function build(): Metrics {
@@ -89,8 +91,19 @@ function build(): Metrics {
       buckets: [0.5, 1, 2.5, 5, 10, 30, 60, 120, 300],
       registers: [registry],
     }),
+    // Carries the commit as a label so "which version is live?" is answerable
+    // from the metrics alone, per environment, without shelling onto the host
+    // or trusting a deployment record.
+    buildInfo: new Gauge({
+      name: "notebook_build_info",
+      help: "Always 1; the revision label carries the running commit.",
+      labelNames: ["revision"] as const,
+      registers: [registry],
+    }),
   };
 }
 
 export const metrics: Metrics =
   globalForMetrics.__metrics ?? (globalForMetrics.__metrics = build());
+
+metrics.buildInfo.set({ revision: process.env.GIT_REVISION ?? "unknown" }, 1);
