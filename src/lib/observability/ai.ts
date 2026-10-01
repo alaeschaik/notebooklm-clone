@@ -48,12 +48,27 @@ export async function recordAiCall<T>(
   }
 }
 
-/** For streaming calls, where usage is only known once the stream has ended. */
-export function recordAiUsage(
+/**
+ * The streaming counterpart of recordAiCall, for calls whose outcome is only
+ * known once the stream has ended.
+ *
+ * This records the same three things a wrapped call does — the request, its
+ * outcome and its duration — and not only the tokens. Recording usage alone
+ * would leave the busiest operation missing from the request counter, which is
+ * what the error-rate alert divides by: a provider outage on the streaming
+ * path would show up as a sudden absence of tokens and nothing else.
+ */
+export function recordAiStream(
   labels: { provider: string; model: string; operation: string },
-  usage: AiUsage,
+  {
+    outcome,
+    seconds,
+    usage,
+  }: { outcome: "success" | "error" | "canceled"; seconds: number; usage?: AiUsage },
 ) {
-  recordUsage(labels, usage);
+  metrics.aiRequests.inc({ ...labels, outcome });
+  metrics.aiDuration.observe(labels, seconds);
+  if (usage) recordUsage(labels, usage, seconds);
 }
 
 function recordUsage(

@@ -7,7 +7,7 @@ import { MODEL, getClaude, groundedDefaults } from "@/lib/ai/claude";
 import { buildContext } from "@/lib/ai/context";
 import { chatSystem } from "@/lib/ai/prompts";
 import { getLocale } from "@/lib/i18n/server";
-import { recordAiUsage } from "@/lib/observability/ai";
+import { recordAiStream } from "@/lib/observability/ai";
 import { getDb } from "@/lib/db";
 import { messages, notebooks, type CitationMarker, type StoredCitation } from "@/lib/db/schema";
 
@@ -101,6 +101,13 @@ async function handlePOST(
 
         let answer = "";
         const markers: CitationMarker[] = [];
+        const started = process.hrtime.bigint();
+        const elapsed = () => Number(process.hrtime.bigint() - started) / 1e9;
+        const callLabels = {
+          provider: "anthropic",
+          model: MODEL,
+          operation: "chat",
+        };
 
         try {
           send({
@@ -178,10 +185,11 @@ async function handlePOST(
           // A final block that never reported a stop must not lose its markers.
           flushCitations();
 
-          recordAiUsage(
-            { provider: "anthropic", model: MODEL, operation: "chat" },
+          recordAiStream(callLabels, {
+            outcome: "success",
+            seconds: elapsed(),
             usage,
-          );
+          });
 
           const [saved] = await db
             .insert(messages)
@@ -204,6 +212,14 @@ async function handlePOST(
         } catch (error) {
           // A disconnect surfaces here as an abort. That is the user leaving,
           // not a failure, and logging it as one buries the real ones.
+          // A cancel is counted, but as its own outcome: the error-rate alert
+          // looks at outcome="error", and someone closing a tab must not page
+          // anybody.
+          recordAiStream(callLabels, {
+            outcome: disconnected ? "canceled" : "error",
+            seconds: elapsed(),
+          });
+
           if (!disconnected) {
             log.error("stream failed", { notebookId: notebook.id, error });
             // The response is already a 200 by this point, so the error has to
