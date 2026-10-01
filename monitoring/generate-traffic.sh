@@ -124,11 +124,16 @@ while (( SECONDS < deadline )); do
     fi
 
     if [ "$WITH_AI" = true ] && [ -n "$src" ]; then
-      # Streams, so the body is drained rather than parsed.
-      curl -s -o /dev/null -c "$JAR" -b "$JAR" --max-time 180 \
+      # sourceIds is required: the endpoint refuses to answer without being
+      # told what to ground the answer in. The response is an SSE stream, so
+      # the body is drained and the event types are counted rather than parsed.
+      events=$(curl -s -c "$JAR" -b "$JAR" --max-time 240 \
         -H 'Content-Type: application/json' \
-        -d '{"question":"Welche Pflichten treffen Anbieter von Hochrisikosystemen?"}' \
-        "$BASE/api/notebooks/$nb/chat" && ok=$((ok+1))
+        -d "{\"question\":\"Welche Pflichten treffen Anbieter von Hochrisikosystemen?\",\"sourceIds\":[\"$src\"]}" \
+        "$BASE/api/notebooks/$nb/chat" | grep -c '"type":"done"')
+      if [ "$events" -ge 1 ]; then ok=$((ok+1)); else
+        failed=$((failed+1)); echo "  Chat lieferte kein done-Ereignis"
+      fi
     fi
 
     tally "$(req DELETE "/api/notebooks/$nb")" 200 "DELETE notebook"
