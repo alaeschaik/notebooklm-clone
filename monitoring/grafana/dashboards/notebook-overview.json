@@ -252,8 +252,8 @@
       },
       "targets": [
         {
-          "expr": "notebook_build_info",
-          "legendFormat": "{{environment}} {{revision}}",
+          "expr": "label_replace(notebook_build_info, \"short\", \"$1\", \"revision\", \"(.{7}).*\")",
+          "legendFormat": "{{environment}} {{short}}",
           "refId": "A"
         }
       ],
@@ -269,7 +269,9 @@
             "lastNotNull"
           ]
         },
-        "textMode": "value_and_name"
+        "textMode": "name",
+        "colorMode": "none",
+        "justifyMode": "center"
       }
     },
     {
