@@ -275,7 +275,9 @@
         {
           "expr": "label_replace(notebook_build_info{environment=\"$environment\"}, \"short\", \"$1\", \"revision\", \"(.{7}).*\")",
           "legendFormat": "{{environment}} {{short}}",
-          "refId": "A"
+          "refId": "A",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
