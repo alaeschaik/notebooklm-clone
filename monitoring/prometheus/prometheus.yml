@@ -46,9 +46,13 @@ scrape_configs:
       - targets: ["host.docker.internal:3011"]
         labels: { environment: production }
 
+  # One exporter per environment, each inside that stack's network.
   - job_name: postgres
     static_configs:
-      - targets: [postgres-exporter:9187]
+      - targets: [postgres-exporter-staging:9187]
+        labels: { environment: staging }
+      - targets: [postgres-exporter-production:9187]
+        labels: { environment: production }
 
   - job_name: containers
     static_configs:

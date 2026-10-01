@@ -64,16 +64,24 @@ services:
     ports: ["${GRAFANA_PORT:-3300}:3000"]
     logging: *logging
 
-  postgres-exporter:
+  # One exporter per environment. Neither database publishes a port, so the
+  # only way in is each stack's own compose network — narrower than exposing
+  # Postgres on the host, but it does mean a container per environment rather
+  # than one with two targets.
+  postgres-exporter-production:
     image: prometheuscommunity/postgres-exporter:v0.16.0
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:?required}
-    extra_hosts: ["host.docker.internal:host-gateway"]
-    # Production's Postgres publishes no port, so the only way in is its own
-    # compose network. Joining it read-only here is narrower than exposing the
-    # database on the host.
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN_PRODUCTION:?required}
     networks: [default, production]
+    logging: *logging
+
+  postgres-exporter-staging:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN_STAGING:?required}
+    networks: [default, staging]
     logging: *logging
 
   cadvisor:
@@ -115,6 +123,9 @@ networks:
   production:
     external: true
     name: notebook-production_default
+  staging:
+    external: true
+    name: notebook-staging_default
 
 volumes:
   prometheus-data:

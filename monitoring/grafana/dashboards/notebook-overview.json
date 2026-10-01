@@ -23,6 +23,27 @@
           "value": "Prometheus"
         },
         "hide": 0
+      },
+      {
+        "name": "environment",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "query": {
+          "query": "label_values(notebook_build_info, environment)",
+          "refId": "env"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "production",
+          "value": "production"
+        }
       }
     ]
   },
@@ -43,7 +64,7 @@
       },
       "targets": [
         {
-          "expr": "min(up{job=~\"notebook-app.*\"})",
+          "expr": "min(up{job=~\"notebook-app.*\",environment=\"$environment\"})",
           "legendFormat": "up",
           "refId": "A"
         }
@@ -94,7 +115,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(notebook_http_requests_total[5m]))",
+          "expr": "sum(rate(notebook_http_requests_total{environment=\"$environment\"}[5m]))",
           "legendFormat": "rps",
           "refId": "A"
         }
@@ -129,7 +150,7 @@
       },
       "targets": [
         {
-          "expr": "(sum(rate(notebook_http_requests_total{status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(notebook_http_requests_total[5m])), 0.001)",
+          "expr": "(sum(rate(notebook_http_requests_total{environment=\"$environment\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(notebook_http_requests_total{environment=\"$environment\"}[5m])), 0.001)",
           "legendFormat": "errors",
           "refId": "A"
         }
@@ -182,7 +203,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(notebook_http_request_duration_seconds_bucket[10m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(notebook_http_request_duration_seconds_bucket{environment=\"$environment\"}[10m])))",
           "legendFormat": "p95",
           "refId": "A"
         }
@@ -217,7 +238,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(notebook_ai_cost_usd_total[24h]))",
+          "expr": "sum(increase(notebook_ai_cost_usd_total{environment=\"$environment\"}[24h]))",
           "legendFormat": "usd",
           "refId": "A"
         }
@@ -252,7 +273,7 @@
       },
       "targets": [
         {
-          "expr": "label_replace(notebook_build_info, \"short\", \"$1\", \"revision\", \"(.{7}).*\")",
+          "expr": "label_replace(notebook_build_info{environment=\"$environment\"}, \"short\", \"$1\", \"revision\", \"(.{7}).*\")",
           "legendFormat": "{{environment}} {{short}}",
           "refId": "A"
         }
@@ -290,7 +311,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (route) (rate(notebook_http_requests_total[5m]))",
+          "expr": "sum by (route) (rate(notebook_http_requests_total{environment=\"$environment\"}[5m]))",
           "legendFormat": "{{route}}",
           "refId": "A"
         }
@@ -318,17 +339,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(notebook_http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(notebook_http_request_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(notebook_http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(notebook_http_request_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
           "legendFormat": "p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(notebook_http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(notebook_http_request_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -356,7 +377,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation) (rate(notebook_ai_requests_total[5m]))",
+          "expr": "sum by (operation) (rate(notebook_ai_requests_total{environment=\"$environment\"}[5m]))",
           "legendFormat": "{{operation}}",
           "refId": "A"
         }
@@ -384,7 +405,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (kind) (rate(notebook_ai_tokens_total[5m]))",
+          "expr": "sum by (kind) (rate(notebook_ai_tokens_total{environment=\"$environment\"}[5m]))",
           "legendFormat": "{{kind}}",
           "refId": "A"
         }
@@ -412,7 +433,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation) (increase(notebook_ai_cost_usd_total[1h]))",
+          "expr": "sum by (operation) (increase(notebook_ai_cost_usd_total{environment=\"$environment\"}[1h]))",
           "legendFormat": "{{operation}}",
           "refId": "A"
         }
@@ -440,7 +461,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(notebook_ingest_duration_seconds_bucket[30m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(notebook_ingest_duration_seconds_bucket{environment=\"$environment\"}[30m])))",
           "legendFormat": "{{kind}} p95",
           "refId": "A"
         }
@@ -468,7 +489,7 @@
       },
       "targets": [
         {
-          "expr": "sum(pg_stat_activity_count)",
+          "expr": "sum(pg_stat_activity_count{environment=\"$environment\"})",
           "legendFormat": "connections",
           "refId": "A"
         }
@@ -496,7 +517,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (name) (container_memory_working_set_bytes{name=~\"notebook-.*\"})",
+          "expr": "sum by (name) (container_memory_working_set_bytes{name=~\"notebook-$environment-.*\"})",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
